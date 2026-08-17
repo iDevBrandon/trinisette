@@ -175,6 +175,15 @@ body {
   background: var(--color-panel-3);
 }
 
+/* Console density. `.btn` is sized for a landing page; inside a toolbar or a side rail
+   that reads as a shout. Same button, same border, smaller box — declared here rather
+   than fought with utilities, because `.btn` is a plain class and wins the cascade. */
+.btn-sm {
+  padding: 5px 11px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 /* Every figure in this UI is meant to be compared down a column. */
 .nums {
   font-variant-numeric: tabular-nums;

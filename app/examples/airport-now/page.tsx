@@ -1,33 +1,27 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Label } from "../../../components/ui";
-import WorldConsole from "../../../components/world/WorldConsole";
+import AirportNow from "../../../components/world/AirportNow";
 
 /**
  * The working surface. Deliberately not the case study.
  *
- * `/cases/airport` argues for the idea; this page is the idea in use, with as little
+ * `/cases/airport` argues for the shape; this page is the shape in use, with as little
  * chrome around it as the thing can stand. The coordinate lives in the address bar —
- * `?w=` picks the world, `?t=` pins a seq — so a specific state is a link, which is the
- * whole point of content addressing being real rather than decorative.
+ * `?a=` picks the airport, `?w=` the world, `?t=` pins a seq — so a specific state is a
+ * link, which is the point of content addressing being real rather than decorative.
  */
 export const metadata = {
   title: "Airport Now — Trinisette example",
   description:
-    "Fork a world, act inside it, and see what would have happened — without it happening.",
+    "A worked example of the Trinisette substrate: fork a world, watch an irreversible action be refused outside primary, and trace any figure back to the bytes it came from.",
 };
 
-/** One terminal, for now. When there is a second, the route generalises to /a/:iata/:terminal. */
-const IATA = "YYZ";
-const TERMINAL = "T1";
-
-export default async function AirportNow({
+export default async function AirportNowPage({
   searchParams,
 }: PageProps<"/examples/airport-now">) {
   const sp = await searchParams;
-  const iata = IATA;
-  const terminal = TERMINAL;
 
+  const a = typeof sp.a === "string" ? sp.a.toUpperCase() : "ATL";
   const w = typeof sp.w === "string" ? sp.w : "primary";
   const rawT = typeof sp.t === "string" ? Number(sp.t) : NaN;
   const t = Number.isInteger(rawT) && rawT >= 0 ? rawT : null;
@@ -35,7 +29,7 @@ export default async function AirportNow({
   return (
     <>
       <header className="sticky top-0 z-20 border-b border-line bg-bg/85 backdrop-blur">
-        <div className="mx-auto flex max-w-[1320px] items-center gap-6 px-6 py-3.5 md:px-8">
+        <div className="mx-auto flex max-w-330 items-center gap-6 px-6 py-3.5 md:px-8">
           <Link href="/" className="flex items-center gap-2.5">
             <Image
               src="/logo.png"
@@ -59,10 +53,6 @@ export default async function AirportNow({
             </Link>
             <span className="text-fg-4">/</span>
             <span className="text-fg">airport-now</span>
-            <span className="text-fg-4">·</span>
-            <span className="text-fg-3">
-              {iata} {terminal}
-            </span>
           </nav>
 
           <Link
@@ -74,56 +64,79 @@ export default async function AirportNow({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1320px] px-6 py-8 md:px-8 md:py-10">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
-          <div>
-            <Label className="text-fg-4">example · Airport Now</Label>
-            <h1 className="mt-2 text-h2 text-fg">
-              {iata.toUpperCase()} · {terminal.toUpperCase()}
-            </h1>
+      <main className="mx-auto w-full max-w-330 px-6 py-8 md:px-8 md:py-10">
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-8 gap-y-2">
+          <div className="flex items-baseline gap-4">
+            <h1 className="text-h2 text-fg">Airport Now</h1>
+            <span className="text-[12.5px] text-fg-3">
+              A real domain with real coverage gaps, running on the substrate.
+              Poke at it.
+            </span>
           </div>
-          <p className="max-w-[52ch] text-b1 text-fg-3">
-            Fork this terminal into a world of your own, act inside it, and
-            watch reality stay where it was. Objects and actions are how you
-            work; the coordinate on the bar is what makes any state you reach a
-            link you can send.
-          </p>
+          <span className="font-mono text-[11px] text-fg-4">
+            ?a= airport · ?w= world · ?t= seq — every state here is a link
+          </span>
         </div>
 
-        <WorldConsole initialWorld={w} initialSeq={t} syncUrl />
-
-        <div className="mt-8 grid gap-px border border-line bg-line md:grid-cols-3">
-          {[
-            [
-              "?w=",
-              "picks the world",
-              "Absent means primary — reality. Anything else is a fork, and irreversible actions are refused there.",
-            ],
-            [
-              "?t=",
-              "pins a seq",
-              "Look at an earlier state. Worlds are append-only, so the past is readable but not writable.",
-            ],
-            [
-              "hash",
-              "is the proof",
-              "The root changes only when the state does. Same state, same address — that is what makes replay checkable.",
-            ],
-          ].map(([k, h, d]) => (
-            <div key={k} className="bg-panel p-5">
-              <code className="font-mono text-[12px] text-accent">{k}</code>
-              <div className="mt-1.5 text-b2 text-fg">{h}</div>
-              <p className="mt-2 text-b1 text-fg-3">{d}</p>
-            </div>
-          ))}
+        <div className="mb-4 flex flex-wrap gap-x-6 gap-y-1 border-y border-line py-2 text-[11.5px] text-fg-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.13em] text-fg-4">
+            what to check
+          </span>
+          <span>
+            <span className="text-fg-2">fork</span> is O(1) and shares the
+            parent&rsquo;s root
+          </span>
+          <span>
+            <span className="text-fg-2">publish</span> is refused outside
+            primary by the runtime, not the UI
+          </span>
+          <span>
+            <span className="text-fg-2">any posted number</span> traces back to
+            a response hash
+          </span>
+          <span>
+            <span className="text-fg-2">16 airports</span> have no queue feed —
+            graft answers that
+          </span>
         </div>
 
-        <p className="mt-6 max-w-[80ch] text-b1 text-fg-3">
-          Worlds are held in memory in this build, so a link to a forked world
-          resolves only in the session that forked it. Persisting them is what
-          turns these addresses from a demonstration into something you can put
-          in a bug report.
-        </p>
+        <AirportNow initialAirport={a} initialWorld={w} initialSeq={t} />
+
+        <div className="mt-5 flex flex-wrap items-baseline gap-x-6 gap-y-2 border-t border-line pt-4 text-[11.5px] text-fg-3">
+          <span>
+            Wait figures are <span className="text-fg-2">modelled</span>; the
+            coverage map, tiers and upstream URLs are real, from the
+            project&rsquo;s own source survey.
+          </span>
+          <span>
+            One live upstream:{" "}
+            <a
+              href="https://nasstatus.faa.gov/api/airport-status-information"
+              target="_blank"
+              rel="noreferrer"
+              className="text-fg-2 underline decoration-line underline-offset-2 hover:text-accent"
+            >
+              FAA NAS Status
+            </a>
+            .
+          </span>
+          <span>
+            Product shape from{" "}
+            <a
+              href="https://github.com/mylee04/airport-now"
+              target="_blank"
+              rel="noreferrer"
+              className="text-fg-2 underline decoration-line underline-offset-2 hover:text-accent"
+            >
+              mylee04/airport-now
+            </a>{" "}
+            — domain only, no code (that repo states no licence).
+          </span>
+          <span className="text-fg-4">
+            Worlds live in memory, so a fork link resolves only in the session
+            that forked it.
+          </span>
+        </div>
       </main>
     </>
   );

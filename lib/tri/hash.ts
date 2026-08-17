@@ -119,3 +119,17 @@ export const hash = (v: unknown): string => sha256Hex(canonical(v));
 
 /** Short form for display. Never an identity. */
 export const short = (h: string, n = 8): string => h.slice(0, n);
+
+/**
+ * Action params, one line. A cassette payload is tens of kilobytes of captured bytes —
+ * printing it raw turns the lineage into noise and truncates mid-escape. Its size is the
+ * meaningful part here; the bytes themselves are in the snapshot, which is the point.
+ */
+export function fmtParams(params: Record<string, unknown> | undefined): string {
+  return Object.entries(params ?? {})
+    .map(([k, v]) => {
+      const s = typeof v === "string" ? v : JSON.stringify(v);
+      return s.length > 42 ? `${k}=⟨${s.length.toLocaleString()} B⟩` : `${k}=${s}`;
+    })
+    .join(" · ");
+}

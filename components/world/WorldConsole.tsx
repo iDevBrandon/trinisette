@@ -1,26 +1,28 @@
 "use client";
 
 /**
- * World console — run a world, fork it, and see what would have happened.
+ * The substrate underneath the product surface.
  *
  * Deliberately NOT called an ontology browser. Objects, links and actions are the
  * vocabulary you act through; they are not what this screen is for. Foundry sells the
- * ontology and attaches what-if to it. Here the branching is the product and the
- * ontology is the layer underneath, so the screen leads with the coordinate — one world
- * at one seq, address on the bar — and the object graph is how you get work done inside it.
+ * ontology and attaches what-if to it. Here the branching is the product and the ontology
+ * is the layer beneath, so the console leads with the coordinate — one world at one seq,
+ * address on the bar — and the object graph is how you get work done inside it.
+ *
+ * This component is controlled: the app above owns the store, so the traveller-facing
+ * panels and this one are looking at the same world, not two copies of it.
  *
  * Nothing here special-cases behaviour in the component. The parameter forms are built
  * from each action's declared `params`; validation messages come back from the runtime;
  * and PublishAlert is refused outside the primary world by `invoke()`, not by a disabled
- * prop. Fork an experiment, try to publish, and read the reason the runtime gives.
+ * prop.
  */
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
-import { AIRPORT_ONTOLOGY, seedAirport } from "../../lib/tri/airport";
-import { short } from "../../lib/tri/hash";
+import { useMemo, useState } from "react";
+import { AIRPORT_ONTOLOGY } from "../../lib/tri/airport";
+import { fmtParams, short } from "../../lib/tri/hash";
 import {
-  createStore, fork, headOf, invoke, lineage, objKey,
-  type Store, type OntoObject,
+  headOf, invoke, lineage, objKey,
+  type OntoObject, type Store,
 } from "../../lib/tri/runtime";
 import { Label } from "../ui";
 
@@ -33,53 +35,27 @@ const STATUS = {
 } as const;
 
 export interface WorldConsoleProps {
-  /** Coordinate from the URL. `?w=` selects the world, `?t=` pins a seq. */
-  initialWorld?: string;
-  initialSeq?: number | null;
-  /** When true, world/seq changes are written back to the address bar. */
-  syncUrl?: boolean;
+  store: Store;
+  setStore: (s: Store) => void;
+  world: string;
+  /** null = follow head. A number pins the view to that seq (read-only). */
+  pinned: number | null;
+  setPinned: (t: number | null) => void;
+  /** Preselect an object, e.g. the checkpoint the traveller clicked upstairs. */
+  focus?: string;
 }
 
-export default function WorldConsole({ initialWorld = "primary", initialSeq = null, syncUrl = false }: WorldConsoleProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const search = useSearchParams();
-
-  const [store, setStore] = useState<Store>(() => createStore(seedAirport));
-  const [world, setWorldState] = useState(initialWorld);
-  /** null = follow head. A number pins the view to that seq (read-only). */
-  const [pinned, setPinned] = useState<number | null>(initialSeq);
-  const [selected, setSelected] = useState(objKey("Checkpoint", "A"));
+export default function WorldConsole({ store, setStore, world, pinned, setPinned, focus }: WorldConsoleProps) {
+  const [selected, setSelected] = useState(focus ?? objKey("Clock", "world"));
   const [actionId, setActionId] = useState(onto.actions[0].id);
-  const [params, setParams] = useState<Record<string, string>>({ checkpoint: "A", lanes: "4" });
+  const [params, setParams] = useState<Record<string, string>>({ minutes: "30" });
   const [flash, setFlash] = useState<{ status: keyof typeof STATUS; reason?: string; action: string } | null>(null);
 
-  const writeUrl = useCallback((w: string, t: number | null) => {
-    if (!syncUrl) return;
-    const q = new URLSearchParams(search.toString());
-    if (w === "primary") q.delete("w"); else q.set("w", w);
-    if (t === null) q.delete("t"); else q.set("t", String(t));
-    const s = q.toString();
-    router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
-  }, [syncUrl, search, router, pathname]);
-
-  const setWorld = useCallback((w: string) => {
-    setWorldState(w); setPinned(null); writeUrl(w, null);
-  }, [writeUrl]);
-
-  const pin = useCallback((t: number | null) => {
-    setPinned(t); writeUrl(world, t);
-  }, [writeUrl, world]);
-
-  const known = store.worlds[world] !== undefined;
-  /** Every store lookup goes through a world that is known to exist. */
-  const activeId = known ? world : "primary";
-  const head = headOf(store, activeId);
+  const head = headOf(store, world);
   const primaryHead = headOf(store, "primary");
-  const w = store.worlds[activeId];
+  const w = store.worlds[world];
   const action = onto.actions.find((a) => a.id === actionId)!;
   const chain = useMemo(() => lineage(store, head.id), [store, head.id]);
-  /** What is on screen: head, or the pinned ancestor. */
   const view = useMemo(
     () => (pinned === null ? head : chain.find((s) => s.world === head.world && s.seq === pinned) ?? head),
     [pinned, head, chain],
@@ -106,83 +82,22 @@ export default function WorldConsole({ initialWorld = "primary", initialSeq = nu
   }
 
   function run() {
-    const r = invoke(store, onto, activeId, actionId, params);
+    const r = invoke(store, onto, world, actionId, params);
     setStore(r.store);
     setFlash({ status: r.status, reason: r.reason, action: action.label });
-  }
-
-  function doFork() {
-    const n = Object.keys(store.worlds).length;
-    const name = `exp-${n}`;
-    setStore(fork(store, activeId, name, `forked from ${activeId} @ seq ${head.seq}`));
-    setWorld(name);
-    setFlash(null);
   }
 
   const cell = "border-line";
 
   return (
     <section className="border border-line bg-panel">
-      {/* ── coordinate bar ───────────────────────────────────────────── */}
-      <div className={`flex flex-wrap items-center gap-x-6 gap-y-3 border-b ${cell} px-4 py-3`}>
-        <div className="flex items-center gap-2">
-          <Label className="text-fg-4">world</Label>
-          {Object.values(store.worlds).map((x) => (
-            <button
-              key={x.id}
-              onClick={() => { setWorld(x.id); setFlash(null); }}
-              className={`border px-2.5 py-1 font-mono text-[11px] transition-colors ${
-                x.id === activeId
-                  ? "border-fg bg-fg text-bg"
-                  : "border-line text-fg-2 hover:border-fg-4 hover:text-fg"
-              }`}
-            >
-              {x.name}
-              {x.kind === "primary" && <span className="ml-1.5 opacity-60">★</span>}
-            </button>
-          ))}
-          <button
-            onClick={doFork}
-            className="border border-line px-2.5 py-1 font-mono text-[11px] text-fg-2 transition-colors hover:border-fg-4 hover:text-fg"
-          >
-            + fork
-          </button>
-        </div>
-
-        <div className="ml-auto flex items-center gap-5 font-mono text-[11px]">
-          <span className="text-fg-3">
-            seq <span className="nums text-fg">{view.seq}</span>
-            <span className="text-fg-4"> / {head.seq}</span>
-          </span>
-          <span className="text-fg-3">
-            root <span className="text-fg">{short(view.root, 10)}</span>
-          </span>
-          <span className="text-fg-4">{short(view.id, 10)}</span>
-        </div>
-      </div>
-
-      {!known && (
-        <div className={`border-b ${cell} border-warn/40 bg-warn/[0.07] px-4 py-2.5 text-[11.5px] text-fg-2`}>
-          <span className="font-mono text-warn">?w={initialWorld}</span> is not a world in this
-          session. Worlds live in memory here, so a link to a forked world only resolves for whoever
-          forked it — persisting them is what makes these addresses durable.
-        </div>
-      )}
-
-      {known && w.kind !== "primary" && (
-        <div className={`border-b ${cell} bg-panel-2 px-4 py-2 text-[11.5px] text-fg-3`}>
-          <span className="font-mono text-fg-2">{w.name}</span> — {w.hypothesis}. Irreversible
-          actions are suppressed here; <span className="text-fg-2">primary is untouched</span>.
-        </div>
-      )}
-
-      <div className="grid lg:grid-cols-[220px_1fr_320px]">
+      <div className="grid lg:grid-cols-[230px_1fr_330px]">
         {/* ── objects ────────────────────────────────────────────────── */}
         <div className={`border-b ${cell} lg:border-b-0 lg:border-r`}>
           <div className={`border-b ${cell} px-4 py-2.5`}>
             <Label className="text-fg-4">objects</Label>
           </div>
-          <div className="max-h-[380px] overflow-y-auto py-1">
+          <div className="max-h-[420px] overflow-y-auto py-1">
             {onto.objects.map((t) => (
               <div key={t.id} className="px-2 py-1.5">
                 <div className="px-2 font-mono text-[10px] uppercase tracking-[0.14em] text-fg-4">
@@ -192,7 +107,7 @@ export default function WorldConsole({ initialWorld = "primary", initialSeq = nu
                   <button
                     key={o.key}
                     onClick={() => setSelected(objKey(o.typeId, o.key))}
-                    className={`mt-1 block w-full px-2 py-1 text-left text-[12.5px] transition-colors ${
+                    className={`mt-1 block w-full px-2 py-1 text-left font-mono text-[11.5px] transition-colors ${
                       selected === objKey(o.typeId, o.key)
                         ? "bg-accent-tint text-fg"
                         : "text-fg-2 hover:bg-panel-2"
@@ -214,7 +129,7 @@ export default function WorldConsole({ initialWorld = "primary", initialSeq = nu
 
           {!obj ? (
             <div className="px-4 py-6 text-[12.5px] text-fg-3">
-              This object does not exist in <span className="font-mono text-fg-2">{activeId}</span>.
+              This object does not exist in <span className="font-mono text-fg-2">{world}</span> at seq {view.seq}.
             </div>
           ) : (
             <div className="px-4 py-4">
@@ -228,7 +143,7 @@ export default function WorldConsole({ initialWorld = "primary", initialSeq = nu
                 <div className="mt-2 border border-line">
                   {Object.entries(obj.props).map(([k, v]) => {
                     const base = primaryHead.state.objects[selected]?.props[k];
-                    const drifted = activeId !== "primary" && base !== undefined && base !== v;
+                    const drifted = world !== "primary" && base !== undefined && base !== v;
                     return (
                       <div key={k} className={`flex items-baseline justify-between gap-4 border-b ${cell} px-3 py-2 last:border-b-0`}>
                         <span className="text-[12px] text-fg-3">{k}</span>
@@ -250,8 +165,14 @@ export default function WorldConsole({ initialWorld = "primary", initialSeq = nu
                 <div>
                   <Label className="text-fg-4">provenance</Label>
                   <div className="mt-1.5 font-mono text-[11px] leading-relaxed text-fg-3">
-                    <div>{obj.prov.source} · {obj.prov.originKind}</div>
-                    <div className="text-fg-4">{obj.prov.originWorld} / seq {obj.prov.originSeq}</div>
+                    <div>
+                      {obj.prov.source} · {obj.prov.originKind}
+                      {obj.prov.via && <span className="text-warn"> via {obj.prov.via}</span>}
+                    </div>
+                    <div className="text-fg-4">
+                      {obj.prov.originWorld} / seq {obj.prov.originSeq}
+                      {obj.prov.confidence !== undefined && ` · conf ${Math.round(obj.prov.confidence * 100)}%`}
+                    </div>
                   </div>
                 </div>
                 <div>
@@ -334,6 +255,16 @@ export default function WorldConsole({ initialWorld = "primary", initialSeq = nu
                     >
                       {spec.options.map((o) => <option key={o} value={o}>{o}</option>)}
                     </select>
+                  ) : spec.multiline ? (
+                    // Cassette payloads land here. Paste a recorded capture and the world
+                    // replays to the address it had when that capture was live.
+                    <textarea
+                      value={params[name] ?? ""}
+                      onChange={(e) => setParams({ ...params, [name]: e.target.value })}
+                      rows={5}
+                      placeholder='{"feedId":"faa.nasstatus","entries":[…]}'
+                      className="mt-1 w-full resize-y border border-line bg-panel px-2 py-1.5 font-mono text-[10.5px] leading-relaxed text-fg placeholder:text-fg-4"
+                    />
                   ) : (
                     <input
                       value={params[name] ?? ""}
@@ -366,7 +297,7 @@ export default function WorldConsole({ initialWorld = "primary", initialSeq = nu
                   Fork from this point, or return to the head.
                 </p>
                 <button
-                  onClick={() => pin(null)}
+                  onClick={() => setPinned(null)}
                   className="mt-3 border border-line px-2.5 py-1 font-mono text-[11px] text-fg-2 hover:border-fg-4 hover:text-fg"
                 >
                   go to head
@@ -391,19 +322,19 @@ export default function WorldConsole({ initialWorld = "primary", initialSeq = nu
         </div>
       </div>
 
-      {/* ── snapshot log ───────────────────────────────────────────────── */}
+      {/* ── lineage ────────────────────────────────────────────────────── */}
       <div className={`border-t ${cell}`}>
         <div className={`flex items-center gap-3 border-b ${cell} px-4 py-2.5`}>
           <Label className="text-fg-4">lineage</Label>
           <span className="font-mono text-[10.5px] text-fg-4">
-            {activeId} · {chain.length} snapshot{chain.length === 1 ? "" : "s"}
+            {world} · {chain.length} snapshot{chain.length === 1 ? "" : "s"}
           </span>
         </div>
-        <div className="max-h-[190px] overflow-y-auto">
+        <div className="max-h-[210px] overflow-y-auto">
           {chain.map((s) => (
             <button
               key={s.id}
-              onClick={() => s.world === head.world && pin(s.seq === head.seq ? null : s.seq)}
+              onClick={() => s.world === head.world && setPinned(s.seq === head.seq ? null : s.seq)}
               className={`grid w-full grid-cols-[54px_1fr_auto] items-baseline gap-4 border-b ${cell} px-4 py-2 text-left transition-colors last:border-b-0 ${
                 s.id === view.id ? "bg-accent-tint" : "hover:bg-panel-2"
               }`}
@@ -415,7 +346,7 @@ export default function WorldConsole({ initialWorld = "primary", initialSeq = nu
                 {s.cause.kind === "action" ? (
                   <>
                     {s.cause.action}
-                    <span className="text-fg-4">({JSON.stringify(s.cause.params).slice(1, -1)})</span>
+                    <span className="text-fg-4"> {fmtParams(s.cause.params)}</span>
                     {s.cause.suppressed && <span className="ml-2 text-warn">suppressed</span>}
                   </>
                 ) : (

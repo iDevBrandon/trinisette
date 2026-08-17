@@ -1,13 +1,15 @@
 /**
  * The three axes converging on one estimate.
  *
- * This is the diagram that makes the triad concrete: each axis contributes one
- * addressable snapshot, and the estimate is not a vibe — it is the output of a declared
- * Action whose three inputs are all `(world, seq)` coordinates you can go back and read.
+ * Each axis contributes one addressable snapshot. The addresses are the point: a generic
+ * dashboard could show "past / now / other scenario" too; what it could not show is that
+ * every input is a `(world, seq)` coordinate you can go back to, read, and fork from.
  *
- * The addresses are the point. A generic dashboard could show "past / now / forecast"
- * too; what it could not show is that every input has an address, so the estimate can be
- * replayed later and audited to the byte.
+ * Note what Vongola is here and what it is NOT. It is an ANCESTOR SNAPSHOT of this world
+ * — a state this world actually passed through, which is still readable and can still be
+ * forked from. It is not a lookup of yesterday's reading. A past observation that was
+ * never a state of this chain is ordinary data sitting inside the current snapshot; it
+ * has no coordinate, and you cannot branch from it. That difference is the axis.
  */
 import { Axis, Label, type AxisKey } from "./ui";
 
@@ -29,35 +31,35 @@ const TONE = { ok: "text-ok", warn: "text-warn", bad: "text-bad" } as const;
 const SOURCES: SourceCard[] = [
   {
     axis: "mare",
-    role: "other worlds",
-    address: "exp-0800 / seq 3",
-    place: "YYZ T1",
-    when: "if I leave at 08:00",
-    value: 41,
+    role: "a sibling world",
+    address: "exp-1 / seq 3",
+    place: "ATL North Main",
+    when: "if demand runs heavy",
+    value: 85,
     unit: "min",
-    prov: "sibling world, same airport",
+    prov: "forked at seq 1, AssumeDemand",
     tone: "warn",
   },
   {
     axis: "vongola",
-    role: "same world, past",
-    address: "primary / seq 812",
-    place: "YYZ T1",
-    when: "yesterday, same bank",
-    value: 52,
+    role: "an ancestor of this world",
+    address: "primary / seq 1",
+    place: "ATL North Main",
+    when: "before the capture landed",
+    value: 73,
     unit: "min",
-    prov: "this terminal's own lineage",
+    prov: "a snapshot in this chain, still readable",
     tone: "bad",
   },
   {
     axis: "arcobaleno",
-    role: "same world, now",
-    address: "primary / seq 947",
-    place: "YYZ T1",
-    when: "now",
-    value: 25,
+    role: "this world, at head",
+    address: "primary / seq 2",
+    place: "ATL North Main",
+    when: "the captured instant",
+    value: 59,
     unit: "min",
-    prov: "official feed · 4m ago",
+    prov: "official feed · sha e0ed4852",
     tone: "warn",
   },
 ];

@@ -24,6 +24,10 @@ export interface Provenance {
   originSeq: number;
   originKind: "native" | "grafted";
   source: "official" | "community" | "modelled";
+  /** Grafted only: where the borrowed structure came from. A graft with no `via` is a lie. */
+  via?: string;
+  /** 0–1. Carried so a figure can be discounted by its own lineage rather than by a rule in a component. */
+  confidence?: number;
 }
 
 export interface OntoObject {
@@ -85,7 +89,15 @@ export interface Store {
 
 /* ── schema layer (global, shared by every world) ────────────────────────── */
 
-export type ParamSpec = { type: "string" | "number"; label: string; options?: string[]; min?: number; max?: number };
+export type ParamSpec = {
+  type: "string" | "number";
+  label: string;
+  options?: string[];
+  min?: number;
+  max?: number;
+  /** Render as a textarea. Used for cassette payloads, which you can paste to replay. */
+  multiline?: boolean;
+};
 
 export interface ObjectTypeDef {
   id: string;
@@ -100,6 +112,17 @@ export interface ActionTypeDef {
   effect: EffectClass;
   touches: string[];
   params: Record<string, ParamSpec>;
+  /**
+   * Reality may only be observed in the primary world.
+   *
+   * Distinct from `irreversible`, which is about effects leaving the system and is
+   * handled by suppression. This is about effects coming IN: a fork's premises are
+   * false by construction, so injecting a fresh observation of the real world into it
+   * would silently mix a true reading with a false setting. Forks inherit what primary
+   * had at the fork point; to get newer data, re-fork from primary's new head.
+   * Rejected outside primary, not suppressed — there is no counterfactual to compute.
+   */
+  primaryOnly?: boolean;
   /** Preconditions checked before the handler runs. */
   requires?: { objectType: string; keyFromParam: string }[];
   handler: (draft: WorldState, params: Record<string, never>, prov: Provenance) => void;
@@ -227,6 +250,16 @@ export function invoke(
   });
 
   if (!def) return reject(`undeclared action '${actionId}' — nothing runs that nobody typed (I7)`);
+
+  // Read from the DECLARATION, never from the caller (ADR-007).
+  if (def.primaryOnly && world.kind !== "primary") {
+    return reject(
+      `'${def.label}' observes the real world, so it only runs in primary. ` +
+      `'${worldId}' is a counterfactual — a true reading dropped into false premises is not a ` +
+      `counterfactual, it is a contradiction. This world inherited what primary had at its fork ` +
+      `point; re-fork from primary's head to pick up newer data.`,
+    );
+  }
 
   for (const [name, spec] of Object.entries(def.params)) {
     const v = params[name];
