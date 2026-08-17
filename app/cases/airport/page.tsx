@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import AxisConvergence from "../../../components/AxisConvergence";
 import ScenarioCompare from "../../../components/ScenarioCompare";
 import { Axis, Label, Panel, Section } from "../../../components/ui";
 import { buildScenarios, recommend, type ScenarioInput } from "../../../lib/scenarios";
@@ -122,18 +123,33 @@ export default function AirportCase() {
             <span className="text-b2 text-fg">Adjacent airports are not Mare.</span>
           </div>
           <p className="mt-3 max-w-[80ch] text-b1 text-fg-2">
-            DTW and ORD are two objects in the <span className="text-fg">same</span> world — both are
-            real right now. Parallel worlds must be mutually exclusive, and if merely having several
-            rows in a table counted, every database would be Mare. Neighbouring airports are the{" "}
-            <span className="text-fg">source of grafted experience</span>: the lateral edge, not the
-            horizontal axis. That distinction is also what fixes the cold-start problem — a
-            structural pattern (&ldquo;the queue spikes ~90 minutes before the first international
-            bank&rdquo;) transfers; a live reading (&ldquo;ORD is 45 minutes right now&rdquo;) must not.
+            Mare is <span className="text-fg">this airport under a condition that did not
+            happen</span> — a different departure time, a different assumed demand. Those are
+            mutually exclusive, which is the test: only one can become actual.
+            <br /><br />
+            A neighbouring airport fails that test. DTW and ORD are two objects in the{" "}
+            <span className="text-fg">same</span> world and both are real right now; if merely
+            having several rows in a table counted, every database would be Mare. Another airport
+            is the <span className="text-fg">source of grafted experience</span> — the lateral
+            edge, not the horizontal axis — and that is what fixes cold start: a structural pattern
+            (&ldquo;the queue spikes ~90 minutes before the first international bank&rdquo;)
+            transfers; a live reading (&ldquo;ORD is 45 minutes right now&rdquo;) must not.
+            <br /><br />
+            One more edge that is easy to miss: a <em className="not-italic text-fg">later time is
+            not automatically another world</em>. 08:00 is Mare only if it is a departure you could
+            still choose. If it is merely your forecast of what this world will look like at 08:00,
+            that is Vongola extrapolated forward, and treating it as a sibling world double-counts
+            the same timeline.
           </p>
         </Panel>
       </Section>
 
-      <Section index="02" title="Mare, rendered"
+      <Section index="02" title="Where one estimate comes from"
+        lede="Each axis contributes exactly one addressable snapshot, and they converge on a single declared Action. The addresses are the part a normal dashboard cannot show.">
+        <AxisConvergence />
+      </Section>
+
+      <Section index="03" title="Mare, rendered"
         lede="Four candidate departures for an 08:35 boarding. Read across a row to compare worlds; read down a column to see one world end to end.">
         <ScenarioCompare
           airport={i.airport} terminal={i.terminal} boardingAt={i.boardingAt}
@@ -146,7 +162,7 @@ export default function AirportCase() {
         </p>
       </Section>
 
-      <Section index="03" title="What the substrate is doing underneath"
+      <Section index="04" title="What the substrate is doing underneath"
         lede="If the framework were decoration, this page would look the same without it. These three behaviours are what it would buy once the application is built.">
         <Panel>
           {DEMONSTRATES.map(([id, title, body]) => (

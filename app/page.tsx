@@ -1,25 +1,26 @@
 import Image from "next/image";
 import Link from "next/link";
 import StackVsLoop from "../components/StackVsLoop";
+import { ArcobalenoFigure, MareFigure, VongolaFigure } from "../components/TriadDiagram";
 import { Axis, Label, Panel, Row, Section, Triad } from "../components/ui";
 
 const TRIAD = [
   {
-    key: "mare" as const, name: "Mare", axis: "horizontal",
+    key: "mare" as const, name: "Mare", axis: "horizontal", Fig: MareFigure,
     source: "The axis across parallel worlds",
     here: "World",
     body: "An isolated, forkable branch. Forking is O(1): the child shares the parent's root, so nothing is copied. Worlds are mutually exclusive — only one of them can become actual.",
     api: "fork(at, hypothesis) → World",
   },
   {
-    key: "vongola" as const, name: "Vongola", axis: "vertical",
+    key: "vongola" as const, name: "Vongola", axis: "vertical", Fig: VongolaFigure,
     source: "The axis from past to future",
     here: "Lineage",
     body: "Inheritance through time. Two distinct clocks live here: step time within a world, and agent version across generations. Conflating them means the first schema change makes all history unreadable.",
     api: "invoke(world, action, params) → Snapshot",
   },
   {
-    key: "arcobaleno" as const, name: "Arcobaleno", axis: "point",
+    key: "arcobaleno" as const, name: "Arcobaleno", axis: "point", Fig: ArcobalenoFigure,
     source: "A point at a specific place in space-time",
     here: "Agent State",
     body: "One materialized snapshot, content-addressed, at a given (World, seq). Because the address is a hash, reproducibility is testable as equality rather than as resemblance.",
@@ -117,7 +118,7 @@ export default function Home() {
       {/* ── 01 primitives ───────────────────────────────────────────── */}
       <Section
         id="primitives" index="01" title="Three axes, one address"
-        lede="Every state in the system is addressed by (World, time). Mare divides worlds, Vongola carries experience through time, and Arcobaleno is the state existing at that world and moment. The three are orthogonal, which is what makes the address unambiguous."
+        lede="Time runs upward. Mare is the axis that cuts across it, Vongola is the axis along it, and Arcobaleno is the point where a single world meets a single moment. The three are orthogonal, which is what makes the address unambiguous."
       >
         <div className="grid gap-px border border-line bg-line lg:grid-cols-3">
           {TRIAD.map((t) => (
@@ -126,6 +127,9 @@ export default function Home() {
                 <Axis of={t.key} size={18} />
                 <span className="font-mono text-[13px] tracking-[0.14em] text-fg">{t.name.toUpperCase()}</span>
                 <Label className="ml-auto text-fg-4">{t.axis}</Label>
+              </div>
+              <div className="mt-5 border-y border-line-soft py-4">
+                <t.Fig />
               </div>
               <p className="mt-4 text-[12px] italic text-fg-3">{t.source}</p>
               <div className="mt-4 border-t border-line-soft pt-4">
