@@ -1,0 +1,186 @@
+@import "tailwindcss";
+
+/*
+  Trinisette theme — Palantir's, transcribed.
+
+  Every value below was read off palantir.com's own computed styles and CSS custom
+  properties rather than eyeballed from a screenshot. Where their variable name is
+  quoted in a comment, that is the literal name in their stylesheet.
+
+  Three things this pass corrected from the first attempt, all of which change how the
+  page reads:
+
+    1. Root font-size is 18px, not 16. Their whole scale is rem-based off that, so a
+       16px-root copy comes out ~11% small everywhere at once.
+    2. Line-heights are TIGHT — body 1.3–1.43, headline 1.0–1.18. Airy 1.6–1.75 prose
+       is the single biggest thing that makes a copy look like a different site.
+    3. Headlines are Alliance No.1. Only the hero uses Alliance No.2 with ss04. Setting
+       the display face on every heading overshoots the source.
+*/
+@theme {
+  /* ── ground and ink ────────────────────────────────────────────────────
+     --body-color #fff · --body-color-medium #f3f3f3 · --body-color-light #f9f9f9
+     --text-color #1e2124 · --text-color-medium #636363 · --text-color-light #767676 */
+  --color-bg: #ffffff;
+  --color-panel: #ffffff;
+  --color-panel-2: #f9f9f9;
+  --color-panel-3: #f3f3f3;
+
+  /* --border-color is `currentColor`; these are the resolved hairlines. */
+  --color-line: rgba(30, 33, 36, 0.15);
+  --color-line-soft: rgba(30, 33, 36, 0.08);
+  --color-line-strong: #1e2124;
+
+  --color-fg: #1e2124;
+  --color-fg-2: #636363;
+  --color-fg-3: #767676;
+  --color-fg-4: #9a9a9a; /* their --qualitative-default #a7b6c2 is a chart colour, not text */
+
+  /* --accent-color is a deep green, not a blue. */
+  --color-accent: #2b5945;
+  --color-accent-soft: rgba(43, 89, 69, 0.1); /* --accent10-color */
+  --color-accent-tint: #f4f7f6; /* --accent05-opaque-color */
+
+  /* ── qualitative palette, verbatim ─────────────────────────────────── */
+  --color-info: #147eb3; /* --qualitative-0 */
+  --color-ok: #29a634; /* --qualitative-1 */
+  --color-warn: #d1980b; /* --qualitative-2 */
+  --color-bad: #d13913; /* --qualitative-3 */
+  --color-arcobaleno: #634dbf; /* --qualitative-4 */
+  --color-mare: #00a396; /* --qualitative-7 */
+  --color-vongola: #d1980b; /* --qualitative-2 */
+
+  /* ── type scale, verbatim (root 18px) ──────────────────────────────── */
+  --text-b1: 16px;
+  --text-b1--line-height: 1.4286;
+  --text-b2: 18px;
+  --text-b2--line-height: 1.3889;
+  --text-b3: 18px;
+  --text-b3--line-height: 1.3;
+  --text-b4: 20px;
+  --text-b4--line-height: 1.3;
+  --text-h1: 34px;
+  --text-h1--line-height: 1;
+  --text-h2: 34px;
+  --text-h2--line-height: 1.1765;
+  --text-h3: 34px;
+  --text-h3--line-height: 1.1765;
+  /* hero is a page-level override on their homepage: 80px at -3.4px tracking */
+  --text-hero: 80px;
+  --text-hero--line-height: 1;
+
+  --font-sans: "Alliance No.1", var(--font-geist-sans), system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans",
+    "Droid Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-display: "Alliance No.2", "Alliance No.1", var(--font-geist-sans), system-ui,
+    -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/*
+  Alliance No.1 / No.2 are COMMERCIAL faces (Degarism) and are deliberately not bundled.
+  Two ways to switch them on, neither needing a code change:
+
+    1. `local(...)` picks them up if installed on the machine rendering the page — enough
+       for your own screenshots, useless for visitors.
+    2. Drop licensed .woff2 files at public/fonts/Alliance/ and the url() sources win.
+       The filenames match Palantir's own serving convention, so files bought from
+       Degarism drop straight in.
+
+  Until then everything falls back to Geist — a close enough grotesk that the layout does
+  not shift. The alternates the store page does not advertise live in stylistic set 04;
+  that is what `.hero` enables. If you cut your own variant in FontForge, keep the glyphs
+  in ss04 and this keeps working untouched.
+*/
+@font-face {
+  font-family: "Alliance No.1";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src:
+    local("Alliance No.1"), local("AllianceNo1-Regular"),
+    url("/fonts/Alliance/AllianceNo1-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Alliance No.1";
+  font-style: normal;
+  font-weight: 500 700;
+  font-display: swap;
+  src:
+    local("Alliance No.1 Medium"), local("AllianceNo1-Medium"),
+    url("/fonts/Alliance/AllianceNo1-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Alliance No.2";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src:
+    local("Alliance No.2"), local("AllianceNo2-Regular"),
+    url("/fonts/Alliance/AllianceNo2-Regular.woff2") format("woff2");
+}
+
+html {
+  color-scheme: light;
+  /* Their root. Tailwind's rem-based spacing scales with it, which is the point. */
+  font-size: 18px;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--text-b2);
+  line-height: 1.3889;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Hero only — Alliance No.2 with the ss04 alternates, at their tracking. */
+.hero {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-feature-settings: "ss04" 1;
+  letter-spacing: -0.0425em;
+}
+
+/*
+  Buttons, verbatim: square corners, 1px solid ink, 16px / weight 400, no tracking,
+  no uppercase. The squareness is doing most of the work — a radius anywhere on the
+  page immediately reads as "not Palantir".
+*/
+.btn {
+  display: inline-block;
+  border: 1px solid var(--color-line-strong);
+  padding: 14px 19px;
+  font-size: var(--text-b1);
+  font-weight: 400;
+  line-height: 1.4286;
+  letter-spacing: normal;
+  border-radius: 0;
+  transition: background-color 0.15s, color 0.15s;
+}
+.btn-primary {
+  background: var(--color-fg);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: #000;
+}
+.btn-secondary {
+  background: #fff;
+  color: var(--color-fg);
+}
+.btn-secondary:hover {
+  background: var(--color-panel-3);
+}
+
+/* Every figure in this UI is meant to be compared down a column. */
+.nums {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: #fff;
+}
