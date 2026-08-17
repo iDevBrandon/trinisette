@@ -7,21 +7,18 @@ import { Axis, Label, Panel, Row, Section, Triad } from "../components/ui";
 const TRIAD = [
   {
     key: "mare" as const, name: "Mare", axis: "horizontal", Fig: MareFigure,
-    source: "The axis across parallel worlds",
     here: "World",
     body: "An isolated, forkable branch. Forking is O(1): the child shares the parent's root, so nothing is copied. Worlds are mutually exclusive — only one of them can become actual.",
     api: "fork(at, hypothesis) → World",
   },
   {
     key: "vongola" as const, name: "Vongola", axis: "vertical", Fig: VongolaFigure,
-    source: "The axis from past to future",
     here: "Lineage",
     body: "Inheritance through time. Two distinct clocks live here: step time within a world, and agent version across generations. Conflating them means the first schema change makes all history unreadable.",
     api: "invoke(world, action, params) → Snapshot",
   },
   {
     key: "arcobaleno" as const, name: "Arcobaleno", axis: "point", Fig: ArcobalenoFigure,
-    source: "A point at a specific place in space-time",
     here: "Agent State",
     body: "One materialized snapshot, content-addressed, at a given (World, seq). Because the address is a hash, reproducibility is testable as equality rather than as resemblance.",
     api: "materialize(snapshot) → State",
@@ -72,12 +69,13 @@ export default function Home() {
             <a href="#primitives" className="text-[12.5px] text-fg-3 transition-colors hover:text-fg">Primitives</a>
             <a href="#invariants" className="text-[12.5px] text-fg-3 transition-colors hover:text-fg">Invariants</a>
             <Link href="/cases/airport" className="text-[12.5px] text-fg-3 transition-colors hover:text-fg">Case</Link>
+            <Link href="/examples/airport-now" className="text-[12.5px] text-accent transition-colors hover:text-fg">Try it</Link>
           </nav>
         </div>
       </header>
 
       {/* ── hero ────────────────────────────────────────────────────── */}
-      <div className="mx-auto max-w-[1180px] px-6 pt-16 pb-14 md:px-10 md:pt-24 md:pb-20">
+      <div className="mx-auto max-w-[1180px] px-6 pt-8 pb-14 md:px-10 md:pt-12 md:pb-20">
         <Label className="text-fg-4">state &amp; execution substrate</Label>
         <h1 className="hero mt-6 max-w-[19ch] text-[46px] leading-[1] text-fg md:text-hero">
           Infrastructure for agents that must explore <span className="text-fg-3">more than one</span> world.
@@ -93,34 +91,18 @@ export default function Home() {
             className="btn btn-primary">
             See a worked case →
           </Link>
-          <a href="#primitives"
-            className="btn btn-secondary">
-            Read the primitives
-          </a>
+          <Link href="/examples/airport-now" className="btn btn-secondary">
+            Try it live
+          </Link>
         </div>
 
-        <div className="mt-14 grid gap-px border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            ["Engine tests", "21", "passing"],
-            ["Schema invariants", "24", "enforced in SQL"],
-            ["Replay", "byte-identical", "hash equality"],
-            ["Payload sharing", "46 → 21", "across 16 worlds"],
-          ].map(([k, v, n]) => (
-            <div key={k} className="bg-panel px-4 py-4">
-              <Label className="text-fg-4">{k}</Label>
-              <div className="nums mt-2 font-mono text-b4 text-fg">{v}</div>
-              <div className="mt-0.5 text-[11px] text-fg-3">{n}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── 01 primitives ───────────────────────────────────────────── */}
-      <Section
-        id="primitives" index="01" title="Three axes, one address"
-        lede="Time runs upward. Mare is the axis that cuts across it, Vongola is the axis along it, and Arcobaleno is the point where a single world meets a single moment. The three are orthogonal, which is what makes the address unambiguous."
-      >
-        <div className="grid gap-px border border-line bg-line lg:grid-cols-3">
+        {/*
+          The triad sits inside the hero block with no heading of its own. A section
+          title here would name what the table already says, and the section padding
+          would push it below the fold — the idea should be the first thing under the
+          sentence that promises it.
+        */}
+        <div id="primitives" className="mt-14 grid gap-px border border-line bg-line lg:grid-cols-3">
           {TRIAD.map((t) => (
             <div key={t.key} className="flex flex-col bg-panel p-6">
               <div className="flex items-center gap-2.5">
@@ -131,7 +113,6 @@ export default function Home() {
               <div className="mt-5 border-y border-line-soft py-4">
                 <t.Fig />
               </div>
-              <p className="mt-4 text-[12px] italic text-fg-3">{t.source}</p>
               <div className="mt-4 border-t border-line-soft pt-4">
                 <Label className="text-fg-4">here</Label>
                 <div className="mt-1.5 text-b4 text-fg">{t.here}</div>
@@ -157,11 +138,11 @@ export default function Home() {
             and means lineage traversal must follow both edges or every import goes unaudited.
           </p>
         </Panel>
-      </Section>
+      </div>
 
-      {/* ── 02 shape ────────────────────────────────────────────────── */}
+      {/* ── shape ───────────────────────────────────────────────────── */}
       <Section
-        index="02" title="Foundry is an ontology with a what-if feature attached"
+        index="01" title="Foundry is an ontology with a what-if feature attached"
         lede="Trinisette is a branching substrate with an ontology on top. The priority is inverted, and the reason it matters is that agents produce branches at machine rate — content-addressed copy-on-write, O(1) fork, a snapshot per step, and recorded non-determinism are all choices sized for that."
       >
         <StackVsLoop />
@@ -169,7 +150,7 @@ export default function Home() {
 
       {/* ── 03 api ──────────────────────────────────────────────────── */}
       <Section
-        index="03" title="Surface"
+        index="02" title="Surface"
         lede="One primitive group per axis. There is no generic write: every step is an invocation of an action somebody declared in advance, with typed parameters, preconditions, and a fixed effect class."
       >
         <div className="grid gap-px border border-line bg-line lg:grid-cols-3">
@@ -194,7 +175,7 @@ export default function Home() {
 
       {/* ── 04 invariants ───────────────────────────────────────────── */}
       <Section
-        id="invariants" index="04" title="Invariants"
+        id="invariants" index="03" title="Invariants"
         lede="These are the load-bearing claims. Violate one and the coordinate system stops meaning anything, so each is enforced by a constraint or a trigger in the database rather than by convention."
       >
         <Panel>
@@ -216,7 +197,7 @@ export default function Home() {
 
       {/* ── 05 verification ─────────────────────────────────────────── */}
       <Section
-        index="05" title="What has actually been run"
+        index="04" title="What has actually been run"
         lede="Phases 0–3 are implemented against PostgreSQL. The milestone was never that fork() returns — it is that forking, diverging, and replaying leaves the original bit-identical, which is checkable as hash equality because snapshots are content-addressed."
       >
         <div className="grid gap-px border border-line bg-line lg:grid-cols-2">
@@ -260,7 +241,7 @@ s_a2 = replay(A, to=s_a)
 
       {/* ── 06 case ─────────────────────────────────────────────────── */}
       <Section
-        index="06" title="Worked case"
+        index="05" title="Worked case"
         lede="A substrate is only as convincing as something built on it. The first application planned on Trinisette is airport queue intelligence — crowd-reported checkpoint waits, reframed so the traveller’s real question becomes a set of parallel worlds."
       >
         <Link href="/cases/airport" className="group block">
@@ -274,8 +255,9 @@ s_a2 = replay(A, to=s_a)
                   terminal</em> — it is <span className="text-fg">when should I leave</span>. Each candidate
                   departure time is a world, and only one of them will happen. In design; nothing shipped yet.
                 </p>
-                <span className="mt-6 inline-block font-mono text-[12px] text-accent">
-                  Open the case →
+                <span className="mt-6 flex flex-wrap items-center gap-4">
+                  <span className="font-mono text-[12px] text-accent">Open the case →</span>
+                  <span className="font-mono text-[11px] text-fg-4">live at /examples/airport-now</span>
                 </span>
               </div>
               <div className="border-t border-line md:border-t-0 md:border-l">

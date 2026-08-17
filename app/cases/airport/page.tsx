@@ -96,9 +96,16 @@ export default function AirportCase() {
             </div>
           ))}
         </div>
-        <p className="mt-5 max-w-[62ch] text-b1 text-fg-3">
-          Existing apps in this space — Airport Now among them — are prior art, not this. The
-          scenario table below runs on the real engine, but every input is synthetic.
+        <div className="mt-8 flex flex-wrap items-center gap-4">
+          <Link href="/examples/airport-now" className="btn btn-primary">
+            Try it now →
+          </Link>
+          <span className="font-mono text-[12px] text-fg-3">/examples/airport-now</span>
+        </div>
+
+        <p className="mt-6 max-w-[62ch] text-b1 text-fg-3">
+          The console is real — forkable worlds, declared actions, addressed states. The scenario
+          figures further down are modelled inputs, and nothing here is shipped to travellers yet.
         </p>
       </div>
 
@@ -149,7 +156,50 @@ export default function AirportCase() {
         <AxisConvergence />
       </Section>
 
-      <Section index="03" title="Mare, rendered"
+      <Section index="03" title="Use it"
+        lede="The argument only counts if you can operate it. The console lives on its own route so it is a tool rather than a figure in an essay — this page explains the shape, that page is the shape.">
+        <Link
+          href="/examples/airport-now"
+          className="group block border border-line bg-panel transition-colors hover:border-fg-4"
+        >
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-4 px-6 py-7">
+            <div>
+              <Label className="text-fg-4">run a world</Label>
+              <div className="mt-2 font-mono text-[22px] tracking-[0.1em] text-fg">/examples/airport-now</div>
+            </div>
+            <p className="max-w-[46ch] text-b1 text-fg-2">
+              Fork a world, change a checkpoint, and try to publish an alert. The runtime refuses
+              it outside primary and tells you why — that refusal is the product, not the object list.
+            </p>
+            <span className="ml-auto font-mono text-[13px] text-accent transition-transform group-hover:translate-x-0.5">
+              Open the console →
+            </span>
+          </div>
+        </Link>
+        <div className="mt-6 grid gap-px border border-line bg-line md:grid-cols-3">
+          {[
+            ["1", "Fork a world", "Press + fork. The child starts at seq 0 and shares the parent's root — no state is copied."],
+            ["2", "Change something", "Set staffed lanes to 2 on checkpoint A. The wait recomputes and the old primary value shows struck through."],
+            ["3", "Try to publish", "PublishAlert is irreversible. Outside primary the runtime suppresses it — state updates, nothing is emitted."],
+          ].map(([n, t, d]) => (
+            <div key={n} className="bg-panel p-5">
+              <span className="font-mono text-[11px] text-accent">{n}</span>
+              <div className="mt-2 text-b2 text-fg">{t}</div>
+              <p className="mt-2 text-b1 text-fg-3">{d}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-6 max-w-[80ch] text-b1 text-fg-3">
+          Over there, the parameter forms, the validation messages and the suppression are all
+          consequences of the declarations in{" "}
+          <code className="font-mono text-[13px] text-fg-2">lib/tri/airport.ts</code>.
+          Change an action&rsquo;s <code className="font-mono text-[13px] text-fg-2">effect</code> to{" "}
+          <code className="font-mono text-[13px] text-fg-2">irreversible</code> and it starts being
+          refused outside primary, with no change to any component.
+        </p>
+      </Section>
+
+      <Section index="04" title="Mare, rendered"
         lede="Four candidate departures for an 08:35 boarding. Read across a row to compare worlds; read down a column to see one world end to end.">
         <ScenarioCompare
           airport={i.airport} terminal={i.terminal} boardingAt={i.boardingAt}
@@ -162,7 +212,7 @@ export default function AirportCase() {
         </p>
       </Section>
 
-      <Section index="04" title="What the substrate is doing underneath"
+      <Section index="05" title="What the substrate is doing underneath"
         lede="If the framework were decoration, this page would look the same without it. These three behaviours are what it would buy once the application is built.">
         <Panel>
           {DEMONSTRATES.map(([id, title, body]) => (
