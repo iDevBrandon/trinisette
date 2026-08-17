@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone Trinisette engine. It has its own toolchain (node + pg + tsx) and is
+    // not part of the Next app, so it is excluded from linting here and from type
+    // checking via `exclude` in tsconfig.json. Without the tsconfig entry, `next build`
+    // fails on reference/src/store.ts: "Cannot find module 'pg'".
+    "reference/**",
   ]),
 ]);
 
