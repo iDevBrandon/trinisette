@@ -217,7 +217,7 @@ export default function AirportNow({
         <Coordinate
           store={store} world={world} view={view} head={head}
           at={at} localMin={localMin} tzLabel={fmtOffset(offset)} clockSource={clockSource}
-          airport={iata} onWorld={pickWorld} onFork={doFork}
+          subject={iata} onWorld={pickWorld} onFork={doFork}
         />
 
         {/* feed + flash: one thin line each */}
@@ -614,6 +614,7 @@ export default function AirportNow({
             world replays to the address it had when that payload was live.
           </p>
           <WorldConsole
+            onto={onto}
             store={store} setStore={setStore} world={world} pinned={pinned} setPinned={setPinned}
             focus={checkpoints[0] ? objKey("Checkpoint", checkpoints[0].key) : undefined}
           />

@@ -18,15 +18,12 @@
  * prop.
  */
 import { useMemo, useState } from "react";
-import { AIRPORT_ONTOLOGY } from "../../lib/tri/airport";
 import { fmtParams, short } from "../../lib/tri/hash";
 import {
   headOf, invoke, lineage, objKey,
-  type OntoObject, type Store,
+  type OntoObject, type Ontology, type Store,
 } from "../../lib/tri/runtime";
 import { Label } from "../ui";
-
-const onto = AIRPORT_ONTOLOGY;
 
 const STATUS = {
   applied: { cls: "text-ok", border: "border-ok/40 bg-ok/[0.06]" },
@@ -35,6 +32,8 @@ const STATUS = {
 } as const;
 
 export interface WorldConsoleProps {
+  /** The declaration this console renders itself from. Nothing below is domain-specific. */
+  onto: Ontology;
   store: Store;
   setStore: (s: Store) => void;
   world: string;
@@ -45,9 +44,10 @@ export interface WorldConsoleProps {
   focus?: string;
 }
 
-export default function WorldConsole({ store, setStore, world, pinned, setPinned, focus }: WorldConsoleProps) {
+export default function WorldConsole({ onto, store, setStore, world, pinned, setPinned, focus }: WorldConsoleProps) {
   const [selected, setSelected] = useState(focus ?? objKey("Clock", "world"));
-  const [actionId, setActionId] = useState(onto.actions[0].id);
+  const firstAction = onto.actions[0].id;
+  const [actionId, setActionId] = useState(firstAction);
   const [params, setParams] = useState<Record<string, string>>({ minutes: "30" });
   const [flash, setFlash] = useState<{ status: keyof typeof STATUS; reason?: string; action: string } | null>(null);
 

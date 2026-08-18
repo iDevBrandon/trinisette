@@ -37,13 +37,14 @@ export interface CoordinateProps {
   localMin: number;
   tzLabel: string;
   clockSource: string;
-  airport: string;
+  /** What the coordinate is pointing at — an airport code, a terminal, a station. */
+  subject: string;
   onWorld: (w: string) => void;
   onFork: () => void;
 }
 
 export default function Coordinate({
-  store, world, view, head, at, localMin, tzLabel, clockSource, airport, onWorld, onFork,
+  store, world, view, head, at, localMin, tzLabel, clockSource, subject, onWorld, onFork,
 }: CoordinateProps) {
   const [copied, setCopied] = useState(false);
   const worlds = Object.values(store.worlds);
@@ -93,7 +94,7 @@ export default function Coordinate({
           <span className="font-mono text-[10px] tracking-[0.16em] text-fg">ARCOBALENO</span>
         </div>
         <span className="font-mono text-[11.5px] text-fg">
-          <span className="text-arcobaleno">{airport}</span>
+          <span className="text-arcobaleno">{subject}</span>
           <span className="text-fg-4"> / </span>{world}
           <span className="text-fg-4"> / </span><span className="nums">seq {view.seq}</span>
           {view.id !== head.id && <span className="text-warn"> pinned</span>}

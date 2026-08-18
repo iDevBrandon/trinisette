@@ -17,6 +17,7 @@ const eslintConfig = defineConfig([
     // checking via `exclude` in tsconfig.json. Without the tsconfig entry, `next build`
     // fails on reference/src/store.ts: "Cannot find module 'pg'".
     "reference/**",
+  "_to_delete/**",
   ]),
 ]);
 

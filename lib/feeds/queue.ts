@@ -40,10 +40,7 @@ export interface QueueReading {
 }
 
 /** An upstream's published 24-hour forecast. Real shape beats a modelled gaussian. */
-export interface HourlyPoint {
-  hour: number;
-  waitMin: number;
-}
+export interface HourlyPoint { hour: number; waitMin: number }
 
 export interface QueueSnapshot {
   readings: QueueReading[];
@@ -74,13 +71,7 @@ export interface QueueAdapter {
   /** Dotted path to the array of checkpoint records. Set this once a real body is seen. */
   path?: string;
   /** Field-name pins, once a real body is seen. */
-  fields?: {
-    name?: string;
-    wait?: string;
-    level?: string;
-    open?: string;
-    terminal?: string;
-  };
+  fields?: { name?: string; wait?: string; level?: string; open?: string; terminal?: string };
   /**
    * The escape hatch. Some shapes are not an array of records at all — SLC publishes one
    * airport-wide number plus a nested map — and no declarative pin covers that. A small
@@ -92,7 +83,7 @@ export interface QueueAdapter {
   blocked?: string;
 }
 
-const UA = "airport-now/0.1";
+const UA = "airport-now/0.1 (+https://github.com/mylee04/airport-now)";
 const page = (referer: string): Record<string, string> => ({
   accept: "application/json, text/plain, */*",
   referer,
@@ -105,204 +96,59 @@ const page = (referer: string): Record<string, string> => ({
  */
 export const ADAPTERS: QueueAdapter[] = [
   // ── open JSON, no special headers ────────────────────────────────────────
-  {
-    iata: "SLC",
-    url: "https://slcairport.com/ajaxtsa/waittimes",
-    transport: "json",
-    extract: extractSlcFamily,
-  },
-  {
-    iata: "PDX",
-    url: "https://www.pdx.com/TSAWaitTimesRefresh",
-    transport: "json",
-    extract: extractPdx,
-  },
+  { iata: "SLC", url: "https://slcairport.com/ajaxtsa/waittimes", transport: "json", extract: extractSlcFamily },
+  { iata: "PDX", url: "https://www.pdx.com/TSAWaitTimesRefresh", transport: "json", extract: extractPdx },
   // DTW is a flat [{Name, WaitTime}] — the generic pass already reads it, pinned so a
   // renamed field fails loudly instead of returning an empty board.
-  {
-    iata: "DTW",
-    url: "https://proxy.metroairport.com/SkyFiiTSAProxy.ashx",
-    transport: "json",
-    fields: { name: "Name", wait: "WaitTime" },
-  },
-  {
-    iata: "CLE",
-    url: "https://www.clevelandairport.com/tsa-wait-times-api",
-    transport: "json",
-    extract: extractCle,
-  },
-  {
-    iata: "PHX",
-    url: "https://api.phx.aero/avn-wait-times/raw?Key=4f85fe2ef5a240d59809b63de94ef536",
-    transport: "json",
-    extract: extractPhx,
-  },
-  {
-    iata: "DCA",
-    url: "https://www.flyreagan.com/security-wait-times",
-    transport: "json",
-    extract: extractMwaa,
-  },
-  {
-    iata: "IAD",
-    url: "https://www.flydulles.com/security-wait-times",
-    transport: "json",
-    extract: extractMwaa,
-  },
+  { iata: "DTW", url: "https://proxy.metroairport.com/SkyFiiTSAProxy.ashx", transport: "json", fields: { name: "Name", wait: "WaitTime" } },
+  { iata: "CLE", url: "https://www.clevelandairport.com/tsa-wait-times-api", transport: "json", extract: extractCle },
+  { iata: "PHX", url: "https://api.phx.aero/avn-wait-times/raw?Key=4f85fe2ef5a240d59809b63de94ef536", transport: "json", extract: extractPhx },
+  { iata: "DCA", url: "https://www.flyreagan.com/security-wait-times", transport: "json", extract: extractMwaa },
+  { iata: "IAD", url: "https://www.flydulles.com/security-wait-times", transport: "json", extract: extractMwaa },
 
   // ── page-backed APIs: the public page sends a Referer, so we send the same ──
-  {
-    iata: "CVG",
-    url: "https://api.cvgairport.mobi/checkpoints/CVG",
-    transport: "json",
-    headers: page("https://www.cvgairport.com/"),
-    blocked:
-      "returns 401 with the public page's Referer — this endpoint needs a credential the page holds. Lifting a key out of a page script is the line this project does not cross; if the operator wants it read, they can issue one.",
-  },
-  {
-    iata: "IAH",
-    url: "https://api.houstonairports.mobi/wait-times/checkpoint/iah",
-    transport: "json",
-    headers: page("https://www.fly2houston.com/"),
-    blocked:
-      "returns 401 with the public page's Referer — this endpoint needs a credential the page holds. Lifting a key out of a page script is the line this project does not cross; if the operator wants it read, they can issue one.",
-  },
-  {
-    iata: "HOU",
-    url: "https://api.houstonairports.mobi/wait-times/checkpoint/hou",
-    transport: "json",
-    headers: page("https://www.fly2houston.com/"),
-    blocked:
-      "returns 401 with the public page's Referer — this endpoint needs a credential the page holds. Lifting a key out of a page script is the line this project does not cross; if the operator wants it read, they can issue one.",
-  },
-  {
-    iata: "MCO",
-    url: "https://api.goaa.aero/wait-times/checkpoint/MCO",
-    transport: "json",
-    headers: page("https://orlandoairports.net/"),
-    blocked:
-      "returns 401 with the public page's Referer — this endpoint needs a credential the page holds. Lifting a key out of a page script is the line this project does not cross; if the operator wants it read, they can issue one.",
-  },
-  {
-    iata: "EWR",
-    url: "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/EWR",
-    transport: "json",
-    headers: page("https://www.newarkairport.com/"),
-    extract: extractEwr,
-  },
-  {
-    iata: "MIA",
-    url: "https://www.miami-airport.com/tsa-waittimes.asp",
-    transport: "json",
-    headers: page("https://www.miami-airport.com/"),
-    blocked:
-      "the survey recorded the public page, not the endpoint it calls — this URL returns HTML. The real API is named in the page's own script and needs to be read out once, then pinned here.",
-  },
-  {
-    iata: "DFW",
-    url: "https://www.dfwairport.com/security/",
-    transport: "json",
-    headers: page("https://www.dfwairport.com/"),
-    blocked:
-      "the survey recorded the public page, not the endpoint it calls — this URL returns HTML. The real API is named in the page's own script and needs to be read out once, then pinned here.",
-  },
-  {
-    iata: "CLT",
-    url: "https://www.cltairport.com/airport-info/security/",
-    transport: "json",
-    headers: page("https://www.cltairport.com/"),
-    blocked:
-      "the survey recorded the public page, not the endpoint it calls — this URL returns HTML. The real API is named in the page's own script and needs to be read out once, then pinned here.",
-  },
-  {
-    iata: "PHL",
-    url: "https://www.phl.org/flights/security-information/checkpoint-hours",
-    transport: "json",
-    headers: page("https://www.phl.org/"),
-    blocked:
-      "the survey recorded the public page, not the endpoint it calls — this URL returns HTML. The real API is named in the page's own script and needs to be read out once, then pinned here.",
-  },
+  { iata: "CVG", url: "https://api.cvgairport.mobi/checkpoints/CVG", transport: "json", headers: page("https://www.cvgairport.com/"), blocked: "returns 401 with the public page's Referer — this endpoint needs a credential the page holds. Lifting a key out of a page script is the line this project does not cross; if the operator wants it read, they can issue one." },
+  { iata: "IAH", url: "https://api.houstonairports.mobi/wait-times/checkpoint/iah", transport: "json", headers: page("https://www.fly2houston.com/"), blocked: "returns 401 with the public page's Referer — this endpoint needs a credential the page holds. Lifting a key out of a page script is the line this project does not cross; if the operator wants it read, they can issue one." },
+  { iata: "HOU", url: "https://api.houstonairports.mobi/wait-times/checkpoint/hou", transport: "json", headers: page("https://www.fly2houston.com/"), blocked: "returns 401 with the public page's Referer — this endpoint needs a credential the page holds. Lifting a key out of a page script is the line this project does not cross; if the operator wants it read, they can issue one." },
+  { iata: "MCO", url: "https://api.goaa.aero/wait-times/checkpoint/MCO", transport: "json", headers: page("https://orlandoairports.net/"), blocked: "returns 401 with the public page's Referer — this endpoint needs a credential the page holds. Lifting a key out of a page script is the line this project does not cross; if the operator wants it read, they can issue one." },
+  { iata: "EWR", url: "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/EWR", transport: "json", headers: page("https://www.newarkairport.com/"), extract: extractEwr },
+  { iata: "MIA", url: "https://www.miami-airport.com/tsa-waittimes.asp", transport: "json", headers: page("https://www.miami-airport.com/"), blocked: "the survey recorded the public page, not the endpoint it calls — this URL returns HTML. The real API is named in the page's own script and needs to be read out once, then pinned here." },
+  { iata: "DFW", url: "https://www.dfwairport.com/security/", transport: "json", headers: page("https://www.dfwairport.com/"), blocked: "the survey recorded the public page, not the endpoint it calls — this URL returns HTML. The real API is named in the page's own script and needs to be read out once, then pinned here." },
+  { iata: "CLT", url: "https://www.cltairport.com/airport-info/security/", transport: "json", headers: page("https://www.cltairport.com/"), blocked: "the survey recorded the public page, not the endpoint it calls — this URL returns HTML. The real API is named in the page's own script and needs to be read out once, then pinned here." },
+  { iata: "PHL", url: "https://www.phl.org/flights/security-information/checkpoint-hours", transport: "json", headers: page("https://www.phl.org/"), blocked: "the survey recorded the public page, not the endpoint it calls — this URL returns HTML. The real API is named in the page's own script and needs to be read out once, then pinned here." },
 
   // ── GraphQL ──────────────────────────────────────────────────────────────
   {
-    iata: "JFK",
-    url: "https://api.jfkairport.com/graphql",
-    transport: "graphql",
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json",
-      "user-agent": UA,
-    },
-    blocked:
-      "query not pinned yet — needs the operation the public homepage sends",
+    iata: "JFK", url: "https://api.jfkairport.com/graphql", transport: "graphql",
+    headers: { "content-type": "application/json", accept: "application/json", "user-agent": UA },
+    blocked: "query not pinned yet — needs the operation the public homepage sends",
   },
 
   // ── HTML: a per-airport extractor, once a real page has been read ────────
-  {
-    iata: "ATL",
-    url: "https://dev.atl.com/atlsync/security-wait-times/",
-    transport: "html",
-  },
+  { iata: "ATL", url: "https://dev.atl.com/atlsync/security-wait-times/", transport: "html" },
   { iata: "BNA", url: "https://flynashville.com/", transport: "html" },
   { iata: "BWI", url: "https://bwiairport.com/", transport: "html" },
-  {
-    iata: "DEN",
-    url: "https://www.flydenver.com/security/",
-    transport: "html",
-  },
+  { iata: "DEN", url: "https://www.flydenver.com/security/", transport: "html" },
   { iata: "LAX", url: "https://www.flylax.com/wait-times", transport: "html" },
+  { iata: "MSP", url: "https://www.mspairport.com/airport/security-screening/security-wait-times", transport: "html" },
+  { iata: "CHS", url: "https://iflychs.com/passengers/security-checkpoint/", transport: "html" },
+  { iata: "CMH", url: "https://flycolumbus.com/passengers/security/", transport: "html" },
+  { iata: "JAX", url: "https://flyjacksonville.com/jaa/content.aspx?id=3583", transport: "html" },
+  { iata: "OMA", url: "https://www.flyoma.com/passenger-services/security-checkpoint-wait-times/", transport: "html" },
+  { iata: "SAT", url: "https://flysanantonio.com/home/flights/security-checkpoints-wait-time/", transport: "html" },
+  { iata: "STL", url: "https://www.flystl.com/tsa-security/", transport: "html" },
   {
-    iata: "MSP",
-    url: "https://www.mspairport.com/airport/security-screening/security-wait-times",
-    transport: "html",
-  },
-  {
-    iata: "CHS",
-    url: "https://iflychs.com/passengers/security-checkpoint/",
-    transport: "html",
-  },
-  {
-    iata: "CMH",
-    url: "https://flycolumbus.com/passengers/security/",
-    transport: "html",
-  },
-  {
-    iata: "JAX",
-    url: "https://flyjacksonville.com/jaa/content.aspx?id=3583",
-    transport: "html",
-  },
-  {
-    iata: "OMA",
-    url: "https://www.flyoma.com/passenger-services/security-checkpoint-wait-times/",
-    transport: "html",
-  },
-  {
-    iata: "SAT",
-    url: "https://flysanantonio.com/home/flights/security-checkpoints-wait-time/",
-    transport: "html",
-  },
-  {
-    iata: "STL",
-    url: "https://www.flystl.com/tsa-security/",
-    transport: "html",
-  },
-  {
-    iata: "PIT",
-    url: "https://flypittsburgh.com/pittsburgh-international-airport/security/",
-    transport: "html",
-    blocked:
-      "endpoint and subscription key live in the public page script — read them from the page rather than hardcoding a key",
+    iata: "PIT", url: "https://flypittsburgh.com/pittsburgh-international-airport/security/", transport: "html",
+    blocked: "endpoint and subscription key live in the public page script — read them from the page rather than hardcoding a key",
   },
 ];
 
-export const adapterFor = (iata: string) =>
-  ADAPTERS.find((a) => a.iata === iata.toUpperCase());
+export const adapterFor = (iata: string) => ADAPTERS.find((a) => a.iata === iata.toUpperCase());
 
 /** Airports the survey lists as wired but that have no adapter row yet. */
 export const missingAdapters = () =>
-  SOURCES.filter((s) => s.url && !ADAPTERS.some((a) => a.iata === s.iata)).map(
-    (s) => s.iata,
-  );
+  SOURCES.filter((s) => s.url && !ADAPTERS.some((a) => a.iata === s.iata)).map((s) => s.iata);
+
 
 /* ── pinned extractors ───────────────────────────────────────────────────── */
 
@@ -340,10 +186,7 @@ function extractSlcFamily(body: unknown): QueueSnapshot {
     readings.push({
       checkpoint: "All checkpoints",
       waitMin: general,
-      level:
-        typeof body.rightnow_description === "string"
-          ? body.rightnow_description
-          : undefined,
+      level: typeof body.rightnow_description === "string" ? body.rightnow_description : undefined,
     });
   }
   const pre = num(body.precheck);
@@ -372,8 +215,7 @@ function extractSlcFamily(body: unknown): QueueSnapshot {
       if (!isRecordEarly(row)) continue;
       const hour = typeof row.hour === "number" ? row.hour : Number(row.hour);
       const waitMin = num(row.waittime);
-      if (Number.isFinite(hour) && waitMin !== null)
-        hourly.push({ hour: ((hour % 24) + 24) % 24, waitMin });
+      if (Number.isFinite(hour) && waitMin !== null) hourly.push({ hour: ((hour % 24) + 24) % 24, waitMin });
     }
     hourly.sort((a, b) => a.hour - b.hour);
   }
@@ -382,12 +224,10 @@ function extractSlcFamily(body: unknown): QueueSnapshot {
     readings,
     hourly: hourly.length ? hourly : undefined,
     userReported: num(body.user_reported),
-    level:
-      typeof body.rightnow_description === "string"
-        ? body.rightnow_description
-        : undefined,
+    level: typeof body.rightnow_description === "string" ? body.rightnow_description : undefined,
   };
 }
+
 
 /**
  * PDX — pinned 2026-08-18 against a real response.
@@ -415,37 +255,28 @@ function extractSlcFamily(body: unknown): QueueSnapshot {
  * and returned nothing, and with it the failure came back wearing a plausible number.
  */
 function extractPdx(body: unknown): QueueSnapshot {
-  if (!isRecordEarly(body) || !Array.isArray(body.WaitTimes))
-    return { readings: [] };
+  if (!isRecordEarly(body) || !Array.isArray(body.WaitTimes)) return { readings: [] };
 
   const closed = (name: string): boolean | undefined => {
     const n = name.toLowerCase();
-    if (n.includes("north") && typeof body.NorthCheckpointClosed === "boolean")
-      return !body.NorthCheckpointClosed;
-    if (n.includes("south") && typeof body.SouthCheckpointClosed === "boolean")
-      return !body.SouthCheckpointClosed;
+    if (n.includes("north") && typeof body.NorthCheckpointClosed === "boolean") return !body.NorthCheckpointClosed;
+    if (n.includes("south") && typeof body.SouthCheckpointClosed === "boolean") return !body.SouthCheckpointClosed;
     return undefined;
   };
 
   const readings: QueueReading[] = [];
   for (const row of body.WaitTimes) {
     if (!isRecordEarly(row)) continue;
-    const name =
-      typeof row.CounterName === "string" ? row.CounterName.trim() : "";
+    const name = typeof row.CounterName === "string" ? row.CounterName.trim() : "";
     if (!name) continue;
     const display = row.DisplayText;
     const waitMin = toMinutes(display);
     readings.push({
       // "NorthGeneral" → "North · General", which is what the signage says.
-      checkpoint: name
-        .replace(/([a-z])([A-Z])/g, "$1 · $2")
-        .replace(/Precheck/i, "PreCheck"),
+      checkpoint: name.replace(/([a-z])([A-Z])/g, "$1 · $2").replace(/Precheck/i, "PreCheck"),
       waitMin,
       // Only when the upstream said something that is not a number — "Closed", "<5".
-      level:
-        waitMin === null && typeof display === "string" && display.trim()
-          ? display.trim()
-          : undefined,
+      level: waitMin === null && typeof display === "string" && display.trim() ? display.trim() : undefined,
       open: closed(name),
     });
   }
@@ -477,11 +308,7 @@ function extractCle(body: unknown): QueueSnapshot {
       level: mins === null ? String(raw) : undefined,
     });
     if (f[`${lane}pre`] === true) {
-      readings.push({
-        checkpoint: `Checkpoint ${lane.toUpperCase()} PreCheck`,
-        waitMin: null,
-        level: "available",
-      });
+      readings.push({ checkpoint: `Checkpoint ${lane.toUpperCase()} PreCheck`, waitMin: null, level: "available" });
     }
   }
   return { readings };
@@ -501,8 +328,7 @@ function extractCle(body: unknown): QueueSnapshot {
  * wins — a posted wait that under-promises is the worse error.
  */
 function extractPhx(body: unknown): QueueSnapshot {
-  if (!isRecordEarly(body) || !Array.isArray(body.current))
-    return { readings: [] };
+  if (!isRecordEarly(body) || !Array.isArray(body.current)) return { readings: [] };
 
   const readings: QueueReading[] = [];
   for (const row of body.current) {
@@ -513,12 +339,7 @@ function extractPhx(body: unknown): QueueSnapshot {
     const lo = num(row.projectedMinWaitMinutes);
     const hi = num(row.projectedMaxWaitMinutes);
     const point = num(row.projectedWaitTime);
-    const consistent =
-      point !== null &&
-      lo !== null &&
-      hi !== null &&
-      point >= lo - 1 &&
-      point <= hi + 1;
+    const consistent = point !== null && lo !== null && hi !== null && point >= lo - 1 && point <= hi + 1;
     const waitMin = consistent ? point : (hi ?? point ?? lo);
 
     readings.push({
@@ -541,37 +362,28 @@ function extractPhx(body: unknown): QueueSnapshot {
  * the same row and becomes its own reading rather than being averaged into the main one.
  */
 function extractMwaa(body: unknown): QueueSnapshot {
-  const res =
-    isRecordEarly(body) && isRecordEarly(body.response)
-      ? body.response.res
-      : undefined;
+  const res = isRecordEarly(body) && isRecordEarly(body.response) ? body.response.res : undefined;
   if (!isRecordEarly(res)) return { readings: [] };
 
   const readings: QueueReading[] = [];
   for (const [letter, raw] of Object.entries(res)) {
     if (!isRecordEarly(raw)) continue;
-    const loc =
-      typeof raw.location === "string" && raw.location.trim()
-        ? raw.location.trim()
-        : letter;
+    const loc = typeof raw.location === "string" && raw.location.trim() ? raw.location.trim() : letter;
     const disabled = Number(raw.isDisabled) === 1;
     readings.push({
       checkpoint: loc,
       waitMin: disabled ? null : toMinutes(raw.waittime),
-      level:
-        typeof raw.gates === "string" && raw.gates.trim()
-          ? `gates ${raw.gates.trim()}`
-          : undefined,
+      level: typeof raw.gates === "string" && raw.gates.trim() ? `gates ${raw.gates.trim()}` : undefined,
       open: disabled ? false : undefined,
     });
     if (raw.pre !== undefined && Number(raw.pre_disabled) !== 1) {
       const pre = toMinutes(raw.pre);
-      if (pre !== null)
-        readings.push({ checkpoint: `${loc} PreCheck`, waitMin: pre });
+      if (pre !== null) readings.push({ checkpoint: `${loc} PreCheck`, waitMin: pre });
     }
   }
   return { readings };
 }
+
 
 /**
  * EWR — pinned 2026-08-18. The richest shape in the survey, and the only page-backed
@@ -587,28 +399,19 @@ function extractMwaa(body: unknown): QueueSnapshot {
  * different claim from a zero-minute wait, and is kept different here.
  */
 function extractEwr(body: unknown): QueueSnapshot {
-  const rows = Array.isArray(body)
-    ? body
-    : isRecordEarly(body) && Array.isArray(body.data)
-      ? body.data
-      : null;
+  const rows = Array.isArray(body) ? body : isRecordEarly(body) && Array.isArray(body.data) ? body.data : null;
   if (!rows) return { readings: [] };
 
   const readings: QueueReading[] = [];
   for (const r of rows) {
     if (!isRecordEarly(r)) continue;
 
-    const base = looksTextual(r.title)
-      ? String(r.title).trim()
-      : looksTextual(r.checkPoint)
-        ? String(r.checkPoint).trim()
-        : "";
+    const base = looksTextual(r.title) ? String(r.title).trim()
+      : looksTextual(r.checkPoint) ? String(r.checkPoint).trim() : "";
     if (!base) continue;
     const qType = looksTextual(r.queueType) ? String(r.queueType).trim() : "";
-    const checkpoint =
-      qType && !base.toLowerCase().includes(qType.toLowerCase())
-        ? `${base} · ${qType}`
-        : base;
+    const checkpoint = qType && !base.toLowerCase().includes(qType.toLowerCase())
+      ? `${base} · ${qType}` : base;
 
     const open = typeof r.queueOpen === "boolean" ? r.queueOpen : undefined;
     const known = r.isWaitTimeAvailable !== false;
@@ -628,20 +431,11 @@ function extractEwr(body: unknown): QueueSnapshot {
     readings.push({
       checkpoint,
       waitMin,
-      level:
-        waitMin === null
-          ? !known
-            ? "wait time unavailable"
-            : open === false
-              ? "closed"
-              : looksTextual(r.status)
-                ? String(r.status).trim()
-                : undefined
-          : undefined,
-      open,
-      terminal: looksTextual(r.terminal)
-        ? String(r.terminal).trim()
+      level: waitMin === null
+        ? (!known ? "wait time unavailable" : open === false ? "closed" : looksTextual(r.status) ? String(r.status).trim() : undefined)
         : undefined,
+      open,
+      terminal: looksTextual(r.terminal) ? String(r.terminal).trim() : undefined,
     });
   }
   return { readings };
@@ -650,41 +444,14 @@ function extractEwr(body: unknown): QueueSnapshot {
 /* ── the tolerant normalizer ─────────────────────────────────────────────── */
 
 const NAME_KEYS = [
-  "checkpoint",
-  "checkpointname",
-  "name",
-  "location",
-  "title",
-  "label",
-  "securitycheckpoint",
-  "gate",
-  "lane",
-  "concourse",
-  "displayname",
-  "description",
+  "checkpoint", "checkpointname", "name", "location", "title", "label",
+  "securitycheckpoint", "gate", "lane", "concourse", "displayname", "description",
 ];
 const WAIT_KEYS = [
-  "waitminutes",
-  "waittimeinminutes",
-  "estimatedwaitminutes",
-  "waittime",
-  "wait",
-  "currentwait",
-  "queuetime",
-  "estimatedwait",
-  "avgwait",
-  "averagewait",
-  "minutes",
-  "duration",
+  "waitminutes", "waittimeinminutes", "estimatedwaitminutes", "waittime", "wait",
+  "currentwait", "queuetime", "estimatedwait", "avgwait", "averagewait", "minutes", "duration",
 ];
-const LEVEL_KEYS = [
-  "level",
-  "waitlevel",
-  "congestion",
-  "severity",
-  "band",
-  "category",
-];
+const LEVEL_KEYS = ["level", "waitlevel", "congestion", "severity", "band", "category"];
 const OPEN_KEYS = ["isopen", "open", "isactive", "active", "status", "state"];
 const TERMINAL_KEYS = ["terminal", "terminalname", "terminalcode", "building"];
 
@@ -705,13 +472,11 @@ function pick(
   ok: (v: unknown) => boolean = () => true,
 ): unknown {
   for (const want of keys) {
-    for (const k of Object.keys(rec))
-      if (norm(k) === want && ok(rec[k])) return rec[k];
+    for (const k of Object.keys(rec)) if (norm(k) === want && ok(rec[k])) return rec[k];
   }
   // Second pass: substring match, so `securityWaitTimeMinutes` still lands.
   for (const want of keys) {
-    for (const k of Object.keys(rec))
-      if (norm(k).includes(want) && ok(rec[k])) return rec[k];
+    for (const k of Object.keys(rec)) if (norm(k).includes(want) && ok(rec[k])) return rec[k];
   }
   return undefined;
 }
@@ -740,9 +505,7 @@ export function toMinutes(v: unknown): number | null {
   if (hm || mm) return (hm ? Number(hm[1]) * 60 : 0) + (mm ? Number(mm[1]) : 0);
 
   // "<5", "≤5", "5+", "under 5" — a bound is still a number, and the bound is the answer.
-  const bound = /^(?:<|≤|under\s+|over\s+|>)?\s*(\d+(?:\.\d+)?)\s*\+?$/i.exec(
-    s,
-  );
+  const bound = /^(?:<|≤|under\s+|over\s+|>)?\s*(\d+(?:\.\d+)?)\s*\+?$/i.exec(s);
   return bound ? Math.round(Number(bound[1])) : null;
 }
 
@@ -787,10 +550,7 @@ function findRecordArray(root: unknown): unknown[] | null {
       const vals = Object.values(cur);
       // A map of name → record, lifted into records that carry their own key as a name.
       if (vals.length && vals.every(isRecord)) {
-        const lifted = Object.entries(cur).map(([k, v]) => ({
-          name: k,
-          ...(v as object),
-        }));
+        const lifted = Object.entries(cur).map(([k, v]) => ({ name: k, ...(v as object) }));
         if (lifted.filter(scores).length / lifted.length >= 0.6) return lifted;
       }
       queue.push(...vals);
@@ -804,20 +564,11 @@ export interface NormalizeResult extends QueueSnapshot {
   via: "extractor" | "pinned-path" | "pinned-fields" | "inferred" | "none";
 }
 
-export function normalizeQueue(
-  body: unknown,
-  adapter?: QueueAdapter,
-): NormalizeResult {
+export function normalizeQueue(body: unknown, adapter?: QueueAdapter): NormalizeResult {
   // A pinned extractor is the ground truth for this upstream. Nothing is inferred.
   if (adapter?.extract) {
     const out = adapter.extract(body);
-    return {
-      ...out,
-      readings: [...out.readings].sort((a, b) =>
-        a.checkpoint.localeCompare(b.checkpoint),
-      ),
-      via: "extractor",
-    };
+    return { ...out, readings: [...out.readings].sort((a, b) => a.checkpoint.localeCompare(b.checkpoint)), via: "extractor" };
   }
 
   let records: unknown[] | null = null;
@@ -825,10 +576,7 @@ export function normalizeQueue(
 
   if (adapter?.path) {
     const at = atPath(body, adapter.path);
-    if (Array.isArray(at)) {
-      records = at;
-      via = "pinned-path";
-    }
+    if (Array.isArray(at)) { records = at; via = "pinned-path"; }
   }
   if (!records) {
     records = findRecordArray(body);
@@ -848,16 +596,12 @@ export function normalizeQueue(
     const rawWait = f?.wait ? r[f.wait] : pick(r, WAIT_KEYS, looksNumeric);
     const level = f?.level ? r[f.level] : pick(r, LEVEL_KEYS, looksTextual);
     const openRaw = f?.open ? r[f.open] : pick(r, OPEN_KEYS);
-    const terminal = f?.terminal
-      ? r[f.terminal]
-      : pick(r, TERMINAL_KEYS, looksTextual);
+    const terminal = f?.terminal ? r[f.terminal] : pick(r, TERMINAL_KEYS, looksTextual);
 
     const open =
-      typeof openRaw === "boolean"
-        ? openRaw
-        : typeof openRaw === "string"
-          ? !/closed|inactive|unavailable/i.test(openRaw)
-          : undefined;
+      typeof openRaw === "boolean" ? openRaw
+      : typeof openRaw === "string" ? !/closed|inactive|unavailable/i.test(openRaw)
+      : undefined;
 
     readings.push({
       checkpoint: name.trim(),
@@ -878,8 +622,7 @@ export function normalizeQueue(
 /** A compact key tree, so an unseen response can be pinned without pasting all of it. */
 export function shapeOf(v: unknown, depth = 0): string {
   if (depth > 4) return "…";
-  if (Array.isArray(v))
-    return v.length ? `[${v.length} × ${shapeOf(v[0], depth + 1)}]` : "[]";
+  if (Array.isArray(v)) return v.length ? `[${v.length} × ${shapeOf(v[0], depth + 1)}]` : "[]";
   if (isRecord(v)) {
     const keys = Object.keys(v).slice(0, 14);
     return `{${keys.map((k) => `${k}:${shapeOf(v[k], depth + 1)}`).join(", ")}${Object.keys(v).length > 14 ? ", …" : ""}}`;
@@ -889,9 +632,4 @@ export function shapeOf(v: unknown, depth = 0): string {
 
 /** Stable key for a checkpoint object, derived from the upstream's own name. */
 export const checkpointKey = (iata: string, name: string) =>
-  `${iata.toUpperCase()}-${name
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 24)}`;
+  `${iata.toUpperCase()}-${name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24)}`;
