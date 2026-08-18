@@ -36,8 +36,18 @@ export interface Domain {
 
 export const DOMAINS: Record<string, Domain> = {
   oil: { meta: OIL_META, onto: OIL_ONTOLOGY, seed: seedOil, subject: "BRENT" },
-  weather: { meta: WEATHER_META, onto: WEATHER_ONTOLOGY, seed: seedWeather, subject: "KJFK" },
-  port: { meta: PORT_META, onto: PORT_ONTOLOGY, seed: seedPort, subject: "LAX-P400" },
+  weather: {
+    meta: WEATHER_META,
+    onto: WEATHER_ONTOLOGY,
+    seed: seedWeather,
+    subject: "KJFK",
+  },
+  port: {
+    meta: PORT_META,
+    onto: PORT_ONTOLOGY,
+    seed: seedPort,
+    subject: "LAX-P400",
+  },
 };
 
 /** Plain data only — safe to read from a server component. */
@@ -73,39 +83,60 @@ export interface ExampleCard {
 export const EXAMPLES: ExampleCard[] = [
   {
     slug: "airport",
-    name: "Airport",
-    blurb: "Checkpoint queues across 46 airports. Fork a world, change the staffing, and watch reality stay untouched.",
+    name: "Checkpoint board",
+    blurb:
+      "Live queues at 46 airports on a real FAA feed. Fork the board, change the staffing, and watch reality stay untouched.",
     irreversible: "PublishAlert — a push cannot be unsent",
     gap: "16 airports have no queue feed at all",
     status: "live",
     feed: "FAA NAS Status, live · 8 of 30 queue adapters pinned",
-    demonstrates: ["live ingestion + cassette", "fork isolation", "irreversible suppression", "trace to the bytes"],
+    demonstrates: [
+      "live ingestion + cassette",
+      "fork isolation",
+      "irreversible suppression",
+      "trace to the bytes",
+    ],
   },
   {
     slug: "oil",
     name: "Crude book",
-    blurb: "Cargoes, benchmarks and voyage routes. Price a reroute in a fork, and find that a nomination will not go out from a world that is not real.",
+    blurb:
+      "Cargoes, benchmarks and voyage routes. Price a reroute in a fork, and find that a nomination will not go out from a world that is not real.",
     irreversible: "NominateCargo — a nomination binds a counterparty",
     gap: "assessed and unpriced grades have no intraday shape",
     status: "sketch",
-    demonstrates: ["branchable hedges", "graft a price shape", "irreversible suppression"],
+    demonstrates: [
+      "branchable hedges",
+      "graft a price shape",
+      "irreversible suppression",
+    ],
   },
   {
     slug: "weather",
     name: "Forecast ensemble",
-    blurb: "Members that disagree, and one of them becomes the weather. The cleanest fit for Mare here — meteorology already models futures as mutually exclusive.",
+    blurb:
+      "Members that disagree, and one of them becomes the weather. The cleanest fit for Mare here — meteorology already models futures as mutually exclusive.",
     irreversible: "IssueWarning — a public warning cannot be unsent",
     gap: "sites with no station have no daily shape",
     status: "sketch",
-    demonstrates: ["ensemble as parallel worlds", "graft a diurnal shape", "per-zone local time"],
+    demonstrates: [
+      "ensemble as parallel worlds",
+      "graft a diurnal shape",
+      "per-zone local time",
+    ],
   },
   {
     slug: "port",
     name: "Berth plan",
-    blurb: "Vessels, berths and crane gangs. Two calls start in the same berth on purpose — resolve it in a fork, then try to confirm the window.",
+    blurb:
+      "Vessels, berths and crane gangs. Two calls start in the same berth on purpose — resolve it in a fork, then try to confirm the window.",
     irreversible: "ConfirmWindow — pilots and gangs get booked against it",
     gap: "terminals with no arrival feed have no shape to their day",
     status: "sketch",
-    demonstrates: ["conflicts held, not refused", "branchable crane allocation", "irreversible suppression"],
+    demonstrates: [
+      "conflicts held, not refused",
+      "branchable crane allocation",
+      "irreversible suppression",
+    ],
   },
 ];
