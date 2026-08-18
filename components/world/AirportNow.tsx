@@ -46,8 +46,8 @@ import {
   type Store,
 } from "../../lib/tri/runtime";
 import { Axis, Label } from "../ui";
+import Compare from "./Compare";
 import Coordinate from "./Coordinate";
-import MareCompare from "./MareCompare";
 import { PipelineStages, TraceView } from "./Pipeline";
 import VongolaStrip from "./VongolaStrip";
 import WorldConsole from "./WorldConsole";
@@ -153,11 +153,7 @@ export default function AirportNow({
     [view],
   );
   const worldCount = Object.keys(store.worlds).length;
-  const showing = trace
-    ? "trace"
-    : tab === "compare" && worldCount < 2
-      ? "board"
-      : tab;
+  const showing = trace ? "trace" : tab;
   const derivation = useMemo(
     () => (trace ? derivePosted(view.state, trace) : null),
     [trace, view],
@@ -273,14 +269,14 @@ export default function AirportNow({
     }
   }
 
-  const doFork = () => {
+  const doFork = (from = world) => {
     const name = `exp-${worldCount}`;
     setStore(
       fork(
         store,
-        world,
+        from,
         name,
-        `${iata} at ${fmtClock(localMin)} local, what if`,
+        `forked from ${from} at ${fmtClock(localMin)} local ${iata}`,
       ),
     );
     setWorldReq(name);
@@ -336,7 +332,7 @@ export default function AirportNow({
           clockSource={clockSource}
           subject={iata}
           onWorld={pickWorld}
-          onFork={doFork}
+          onFork={() => doFork()}
         />
 
         {/* feed + flash: one thin line each */}
@@ -529,14 +525,13 @@ export default function AirportNow({
                 {(["board", "compare", "pipeline"] as const).map((k) => (
                   <button
                     key={k}
-                    disabled={k === "compare" && worldCount < 2}
                     onClick={() => {
                       setTab(k);
                       setTrace(null);
                     }}
                     title={
                       k === "compare"
-                        ? "Mare — the same checkpoint under every world at once. Fork first."
+                        ? "Three comparisons: across worlds, across airports, across time."
                         : k === "pipeline"
                           ? "Where these numbers come from: upstream → boundary → parse → ontology → derived, in this world."
                           : undefined
@@ -547,7 +542,7 @@ export default function AirportNow({
                         : "border-line text-fg-3 hover:border-fg-4 hover:text-fg"
                     }`}
                   >
-                    {k === "compare" ? `compare ${worldCount}` : k}
+                    {k}
                   </button>
                 ))}
               </div>
@@ -630,15 +625,18 @@ export default function AirportNow({
             ) : showing === "pipeline" ? (
               <PipelineStages view={view} world={world} />
             ) : showing === "compare" ? (
-              <MareCompare
+              <Compare
                 store={store}
-                activeWorld={world}
+                world={world}
+                view={view}
                 airport={iata}
-                onWorld={pickWorld}
                 checkpoints={checkpoints.map((c) => ({
                   key: c.key,
                   label: String(c.props.label),
                 }))}
+                onWorld={pickWorld}
+                onAirport={pickAirport}
+                onRefork={() => doFork("primary")}
               />
             ) : (
               <>
