@@ -120,18 +120,7 @@ export default async function AirportNowPage({
             </a>
             .
           </span>
-          <span>
-            Product shape from{" "}
-            <a
-              href="https://github.com/mylee04/airport-now"
-              target="_blank"
-              rel="noreferrer"
-              className="text-fg-2 underline decoration-line underline-offset-2 hover:text-accent"
-            >
-              mylee04/airport-now
-            </a>{" "}
-            — domain only, no code (that repo states no licence).
-          </span>
+
           <span className="text-fg-4">
             Worlds live in memory, so a fork link resolves only in the session
             that forked it.

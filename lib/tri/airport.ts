@@ -26,6 +26,7 @@
  */
 import type { FaaEntry } from "../feeds/faa";
 import { delayPressure, worstByAirport } from "../feeds/faa";
+import { checkpointKey as feedCheckpointKey, type QueueReading } from "../feeds/queue";
 import { SOURCES, byIata, type SourceRow } from "../feeds/sources";
 import {
   makeObject, objKey,
@@ -38,6 +39,15 @@ export { fmtClock, fmtOffset, localMinuteOfDay, tzOffsetMin } from "./time";
 
 /** A traveller report counts toward the posted wait for this long. Then it is history, not evidence. */
 export const EVIDENCE_WINDOW_MIN = 120;
+
+/**
+ * How long a direct feed reading stays the anchor.
+ *
+ * Much shorter than a traveller report's window, and deliberately so: an official
+ * checkpoint reading is a measurement of right now and decays fast, while a traveller
+ * report is testimony about a period. Past this, the model takes over and says it did.
+ */
+export const OBSERVATION_WINDOW_MIN = 20;
 
 export const DEMAND: Record<string, number> = { light: 0.7, normal: 1.0, heavy: 1.45 };
 
@@ -67,11 +77,53 @@ export function localMinuteAt(state: WorldState, iata: string): number {
    own Clock object is the only time that exists, which is what lets a snapshot
    address mean something (§ADR-004).                                           */
 
-/** A departure bank: a gaussian bump in demand around a peak minute-of-day. */
+/**
+ * The shape of the day, as a multiplier on the base load.
+ *
+ * Two kinds. A gaussian bump is the modelled fallback — one peak, one width, invented.
+ * An hourly table is a real published forecast, and it wins whenever an upstream has
+ * one: 24 measured points beat a curve someone drew. Both are SHAPE, normalised so the
+ * mean of the day is 1 — which is exactly what makes grafting defensible, because what
+ * transfers is when the day is busy relative to itself, never the level.
+ */
 function bankFactor(curve: OntoObject | undefined, nowMin: number): number {
   if (!curve) return 1;
+
+  if (curve.props.kind === "hourly") {
+    let table: number[];
+    try { table = JSON.parse(String(curve.props.hourly)) as number[]; } catch { return 1; }
+    if (!Array.isArray(table) || table.length !== 24) return 1;
+    const h = nowMin / 60;
+    const i = Math.floor(h) % 24;
+    const j = (i + 1) % 24;
+    const f = h - Math.floor(h);
+    const v = table[i] * (1 - f) + table[j] * f;
+    return Number.isFinite(v) && v > 0 ? v : 1;
+  }
+
   const z = (nowMin - Number(curve.props.peakMin)) / Number(curve.props.spread);
   return 1 + Number(curve.props.amp) * Math.exp(-(z * z));
+}
+
+/** Absolute hourly waits → a mean-1 shape, plus the peak. Level is discarded on purpose. */
+export function hourlyToShape(points: { hour: number; waitMin: number }[]) {
+  const table = new Array<number>(24).fill(1);
+  const seen = new Map<number, number>();
+  for (const p of points) seen.set(((p.hour % 24) + 24) % 24, p.waitMin);
+  if (seen.size === 0) return null;
+
+  const vals = [...seen.values()];
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+  if (!(mean > 0)) return null;
+
+  for (let h = 0; h < 24; h++) {
+    const v = seen.get(h);
+    if (v !== undefined) table[h] = Math.round((v / mean) * 1000) / 1000;
+  }
+  // Hours the upstream omitted keep the day's mean rather than inventing a dip.
+  let peakHour = 0;
+  for (let h = 1; h < 24; h++) if (table[h] > table[peakHour]) peakHour = h;
+  return { table, peakHour, meanWaitMin: Math.round(mean) };
 }
 
 const median = (xs: number[]) => {
@@ -113,6 +165,8 @@ export interface DeriveStep {
 export interface Derivation {
   checkpoint: string;
   airport: string;
+  /** Non-null when a direct feed reading is anchoring the number rather than the model. */
+  observedMin: number | null;
   steps: DeriveStep[];
   modelFormula: string;
   modelMin: number;
@@ -161,12 +215,23 @@ export function derivePosted(state: WorldState, checkpointKey: string): Derivati
 
   const modelMin = Math.round((baseLoad * demandFactor * bank * pressure) / lanes);
 
+  // A direct feed reading, if this airport has one and it is still fresh, is the anchor.
+  // The model does not vanish — it becomes the forward projection from that reading.
+  const observedRaw = c.props.observedMin;
+  const observedAge = c.props.observedAtEpochMin !== undefined
+    ? at - Number(c.props.observedAtEpochMin) : Infinity;
+  const observedFresh = observedRaw !== undefined && observedAge >= 0 && observedAge <= OBSERVATION_WINDOW_MIN;
+  const observedMin = observedFresh ? Number(observedRaw) : null;
+  const anchorMin = observedMin ?? modelMin;
+
   const mine = ofType(state, "Report")
     .filter((r) => r.props.checkpoint === checkpointKey && r.props.current === true);
   const communityMin = mine.length ? median(mine.map((r) => Number(r.props.waitMin))) : 0;
   const wc = mine.length ? Math.min(0.6, 0.2 * mine.length) : 0;
-  const postedMin = Math.round(modelMin * (1 - wc) + communityMin * wc);
-  const confidencePct = Math.round(100 * Math.min(0.95, (FLOOR[basis] ?? 0.4) + 0.05 * mine.length));
+  const postedMin = Math.round(anchorMin * (1 - wc) + communityMin * wc);
+  // An unexpired direct reading is the strongest evidence in the system.
+  const floor = observedFresh ? 0.95 : (FLOOR[basis] ?? 0.4);
+  const confidencePct = Math.round(100 * Math.min(0.95, floor + 0.05 * mine.length));
 
   const clockSource = String(clock.props.source);
   const steps: DeriveStep[] = [
@@ -215,6 +280,21 @@ export function derivePosted(state: WorldState, checkpointKey: string): Derivati
     },
   ];
 
+  if (observedMin !== null) {
+    steps.unshift({
+      label: "observed", value: `${observedMin} min`,
+      from: `direct feed reading, ${Math.round(observedAge)}m old — inside the ${OBSERVATION_WINDOW_MIN}-minute observation window, so it anchors the number and the model becomes the projection from it`,
+      tone: "official",
+      address: c.props.feedSha ? `sha ${String(c.props.feedSha)}` : undefined,
+    });
+  } else if (c.props.observedMin !== undefined) {
+    steps.unshift({
+      label: "observed", value: `${String(c.props.observedMin)} min · stale`,
+      from: `last direct reading is ${Math.round(observedAge)}m old, past the ${OBSERVATION_WINDOW_MIN}-minute window — the model takes over rather than posting a measurement that has expired`,
+      tone: "none",
+    });
+  }
+
   if (mine.length) {
     steps.push({
       label: "crowd", value: `${communityMin} min from ${mine.length}`,
@@ -224,15 +304,16 @@ export function derivePosted(state: WorldState, checkpointKey: string): Derivati
   }
 
   return {
-    checkpoint: checkpointKey, airport: iata, steps,
-    modelFormula: `${baseLoad} × ${demandFactor} × ${bank.toFixed(3)} × ${pressure} ÷ ${lanes} = ${modelMin}`,
+    checkpoint: checkpointKey, airport: iata, observedMin, steps,
+    modelFormula: `${baseLoad} × ${demandFactor} × ${bank.toFixed(3)} × ${pressure} ÷ ${lanes} = ${modelMin}`
+      + (observedMin !== null ? `  (anchor is the ${observedMin}-min reading, not this)` : ""),
     modelMin, communityMin, reportsUsed: mine.length,
     crowdWeightPct: Math.round(wc * 100),
     postedFormula: mine.length
-      ? `${modelMin} × ${(1 - wc).toFixed(2)} + ${communityMin} × ${wc.toFixed(2)} = ${postedMin}`
-      : `no reports in window → posted = model = ${postedMin}`,
+      ? `${anchorMin} × ${(1 - wc).toFixed(2)} + ${communityMin} × ${wc.toFixed(2)} = ${postedMin}`
+      : `no reports in window → posted = ${observedMin !== null ? "observed" : "model"} = ${postedMin}`,
     postedMin, basis, confidencePct,
-    confidenceWhy: `${basis} floor ${Math.round((FLOOR[basis] ?? 0.4) * 100)}%${mine.length ? ` + ${mine.length} corroborating report${mine.length === 1 ? "" : "s"} × 5` : ""}, capped at 95%`,
+    confidenceWhy: `${observedFresh ? "fresh direct reading" : basis} floor ${Math.round(floor * 100)}%${mine.length ? ` + ${mine.length} corroborating report${mine.length === 1 ? "" : "s"} × 5` : ""}, capped at 95%`,
   };
 }
 
@@ -256,6 +337,7 @@ export function recompute(draft: WorldState) {
     const props: OntoObject["props"] = {
       ...c.props,
       basis: d.basis, modelMin: d.modelMin, communityMin: d.communityMin,
+      anchoredOnFeed: d.observedMin !== null,
       reportsUsed: d.reportsUsed, crowdWeightPct: d.crowdWeightPct,
       postedMin: d.postedMin, confidencePct: d.confidencePct,
     };
@@ -357,6 +439,145 @@ export const AIRPORT_ONTOLOGY: Ontology = {
           draft.links.push({ typeId: "status_of", from: k, to: objKey("Airport", iata) });
           draft.links.push({ typeId: "captured_by", from: k, to: objKey("Capture", id) });
         }
+        recompute(draft);
+      },
+    },
+    {
+      id: "IngestQueueFeed",
+      label: "Ingest a queue feed",
+      effect: "pure",
+      primaryOnly: true,
+      touches: ["Capture", "Checkpoint", "Terminal"],
+      note:
+        "Pull one airport's own checkpoint feed. Unlike FAA this is per-airport — thirty different upstreams, no shared schema — so the adapter lives in lib/feeds/queue.ts and the payload records how it was parsed. Ingesting REPLACES that airport's seeded checkpoints with the ones the upstream actually publishes, and calibrates the model so the forward projection starts from the real reading instead of an invention. Primary-only, for the same reason FAA is.",
+      params: {
+        payload: { type: "string", label: "Capture payload (JSON)", multiline: true },
+      },
+      handler: (draft, p, prov) => {
+        const raw = JSON.parse(String(p.payload)) as {
+          feedId: string; iata: string; url: string; fetchedAt: string; tier: string;
+          via: string; bodySha256: string; readings: QueueReading[];
+          hourly?: { hour: number; waitMin: number }[];
+          userReported?: number | null;
+        };
+        const iata = raw.iata.toUpperCase();
+        const airport = draft.objects[objKey("Airport", iata)];
+        if (!airport) return;
+
+        const at = epochMinFromIso(raw.fetchedAt) ?? clockOf(draft);
+        const id = `C${ofType(draft, "Capture").length + 1}`;
+        // Only a pure shape guess is discounted; an extractor or a field pin is not.
+        const inferred = raw.via === "inferred" || raw.via === "none";
+
+        draft.objects[objKey("Capture", id)] = makeObject(
+          "Capture", id,
+          {
+            id, feedId: raw.feedId, url: raw.url, fetchedAt: raw.fetchedAt,
+            live: true, bodySha256: raw.bodySha256, entries: raw.readings.length,
+            airport: iata, via: raw.via,
+          },
+          // An inferred parse is a guess about someone else's schema. It says so, and it
+          // costs confidence until the adapter is pinned against a real response.
+          { ...prov, source: "official", confidence: inferred ? 0.7 : 0.95 },
+        );
+
+        // The upstream's checkpoints replace the seeded stand-ins for this airport. The
+        // old ones stay in every earlier snapshot; a world is append-only, not immutable
+        // in its head state.
+        for (const c of ofType(draft, "Checkpoint")) {
+          if (c.props.airport === iata) delete draft.objects[objKey("Checkpoint", c.key)];
+        }
+        draft.links = draft.links.filter(
+          (l) => !(l.typeId === "in_terminal" && l.from.startsWith(`Checkpoint/${iata}-`)),
+        );
+
+        // A published 24-hour forecast replaces the modelled gaussian outright. Twenty-four
+        // measured points beat a curve someone drew, and it makes this airport a legitimate
+        // graft DONOR for the sixteen that have nothing.
+        if (raw.hourly?.length) {
+          const shape = hourlyToShape(raw.hourly);
+          if (shape) {
+            draft.objects[objKey("Curve", iata)] = makeObject(
+              "Curve", iata,
+              {
+                airport: iata, kind: "hourly",
+                pattern: "published hourly forecast",
+                hourly: JSON.stringify(shape.table),
+                peakMin: shape.peakHour * 60,
+                peak: fmtClock(shape.peakHour * 60),
+                meanWaitMin: shape.meanWaitMin,
+                points: raw.hourly.length,
+              },
+              { ...prov, source: "official", confidence: inferred ? 0.7 : 0.95 },
+            );
+            if (!draft.links.some((l) => l.typeId === "shapes" && l.from === objKey("Curve", iata))) {
+              draft.links.push({ typeId: "shapes", from: objKey("Curve", iata), to: objKey("Airport", iata) });
+            }
+          }
+        }
+
+        const demandFactor = DEMAND[String(airport.props.demand)] ?? 1;
+        const curve = draft.objects[objKey("Curve", iata)];
+        const status = draft.objects[objKey("FaaStatus", iata)];
+        const pressure = status ? Number(status.props.pressure) : 1;
+        const bank = bankFactor(curve, localMinuteOfDay(at, String(airport.props.tz)));
+
+        for (const r of raw.readings) {
+          const key = feedCheckpointKey(iata, r.checkpoint);
+          const tName = r.terminal?.trim() || "Main terminal";
+          const tCode = `${iata}-${tName.toUpperCase().replace(/[^A-Z0-9]+/g, "-").slice(0, 16)}`;
+          if (!draft.objects[objKey("Terminal", tCode)]) {
+            draft.objects[objKey("Terminal", tCode)] = makeObject(
+              "Terminal", tCode, { code: tCode, airport: iata, name: tName }, prov,
+            );
+            draft.links.push({ typeId: "in_airport", from: objKey("Terminal", tCode), to: objKey("Airport", iata) });
+          }
+
+          const observed = r.waitMin;
+          // Calibrate: pick the baseLoad that reproduces this reading under current
+          // conditions, so the model extrapolates from reality rather than replacing it.
+          const divisor = Math.max(0.05, demandFactor * bank * pressure);
+          const baseLoad = observed !== null ? Math.max(1, Math.round(observed / divisor)) : 60;
+
+          const props: OntoObject["props"] = {
+            code: key, label: r.checkpoint, airport: iata, terminal: tCode,
+            lanes: 1, baseLoad,
+            basis: "none", modelMin: 0, communityMin: 0, reportsUsed: 0,
+            crowdWeightPct: 0, postedMin: 0, confidencePct: 0,
+            feedSha: raw.bodySha256.slice(0, 12), sourcedBy: raw.feedId,
+          };
+          if (observed !== null) {
+            props.observedMin = observed;
+            props.observedAtEpochMin = at;
+          }
+          if (r.level) props.level = r.level;
+          if (r.open === false) props.closed = true;
+
+          draft.objects[objKey("Checkpoint", key)] = makeObject(
+            "Checkpoint", key, props,
+            { ...prov, source: "official", confidence: inferred ? 0.7 : 0.95 },
+          );
+          draft.links.push({ typeId: "in_terminal", from: objKey("Checkpoint", key), to: objKey("Terminal", tCode) });
+        }
+
+        // Some upstreams carry their own crowd signal. It is community evidence and is
+        // recorded as such — folding it into the official number would launder it.
+        if (raw.userReported != null && Number.isFinite(raw.userReported) && raw.readings.length) {
+          const id = `R${ofType(draft, "Report").length + 1}`;
+          const first = feedCheckpointKey(iata, raw.readings[0].checkpoint);
+          draft.objects[objKey("Report", id)] = makeObject(
+            "Report", id,
+            {
+              id, airport: iata, checkpoint: first,
+              waitMin: Math.round(Number(raw.userReported)), photos: 0,
+              observedAtEpochMin: at, observedAtLocal: fmtUtc(at),
+              ageMin: 0, current: true, viaFeed: true,
+            },
+            { ...prov, source: "community", confidence: 0.5 },
+          );
+          draft.links.push({ typeId: "reports_on", from: objKey("Report", id), to: objKey("Checkpoint", first) });
+        }
+
         recompute(draft);
       },
     },

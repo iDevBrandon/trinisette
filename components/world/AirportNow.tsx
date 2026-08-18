@@ -21,6 +21,7 @@
  */
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
+import { adapterFor } from "../../lib/feeds/queue";
 import { SOURCES, TIERS, type SourceTier } from "../../lib/feeds/sources";
 import {
   AIRPORT_ONTOLOGY, EVIDENCE_WINDOW_MIN, clockOf, derivePosted, fmtClock, fmtOffset,
@@ -147,6 +148,27 @@ export default function AirportNow({
     });
   }, [store, world]);
 
+  async function ingestQueue() {
+    setIngesting(true);
+    try {
+      const res = await fetch(`/api/feeds/queue/${iata}`, { cache: "no-store" });
+      const data = await res.json();
+      if (!data.ok) {
+        setFlash({ status: "rejected", text: `${iata} queue feed: ${data.error}${data.hint ? ` — ${data.hint}` : ""}` });
+        return;
+      }
+      act("IngestQueueFeed", { payload: JSON.stringify(data) });
+      if (data.via === "inferred") {
+        setFlash({
+          status: "suppressed",
+          text: `${data.readings.length} checkpoints, but the records were found by shape alone — no extractor or field pin for this airport yet. Confidence docked to 70% until it is pinned — GET /api/feeds/queue/${iata}?raw=1 to read the real shape.`,
+        });
+      }
+    } catch (e) {
+      setFlash({ status: "rejected", text: `queue feed unreachable: ${e instanceof Error ? e.message : String(e)}` });
+    } finally { setIngesting(false); }
+  }
+
   async function ingest() {
     setIngesting(true);
     try {
@@ -174,6 +196,7 @@ export default function AirportNow({
 
   const [rCheckpoint, setRCheckpoint] = useState("");
   const [rWait, setRWait] = useState("18");
+  const [rPhotos, setRPhotos] = useState("1");
   const reportTarget = checkpoints.some((c) => c.key === rCheckpoint) ? rCheckpoint : (checkpoints[0]?.key ?? "");
   const [graftFrom, setGraftFrom] = useState("");
   const graftSource = donors.includes(graftFrom) ? graftFrom : (donors[0] ?? "");
@@ -214,15 +237,35 @@ export default function AirportNow({
           ) : (
             <span className="font-mono text-[11px] text-fg-4">not ingested in this world</span>
           )}
+          {(() => {
+            const ad = adapterFor(iata);
+            const why = tier === "none"
+              ? `${iata} has no queue feed — one of the sixteen. Graft a bank shape instead.`
+              : !ad ? `no adapter for ${iata} yet`
+              : ad.blocked ? ad.blocked
+              : ad.transport === "html" ? `${iata} publishes HTML — needs a per-airport extractor pinned from a real page`
+              : `GET ${ad.url}`;
+            const ready = !!ad && !ad.blocked && ad.transport !== "html" && tier !== "none";
+            return (
+              <button
+                onClick={ingestQueue}
+                disabled={ingesting || locked || world !== "primary" || !ready}
+                title={why}
+                className="btn btn-sm ml-auto disabled:opacity-40"
+              >
+                {ready ? `Ingest ${iata} queue →` : `${iata} queue: not wired`}
+              </button>
+            );
+          })()}
           <button
             onClick={ingest}
             disabled={ingesting || locked || world !== "primary"}
             title={world !== "primary"
               ? "IngestFaaStatus is primaryOnly — a true reading dropped into false premises is not a counterfactual. Re-fork from primary for newer data."
               : "The response bytes are hashed into the snapshot, clock included. Keep the payload and this world replays exactly."}
-            className="btn btn-sm ml-auto disabled:opacity-40"
+            className="btn btn-sm disabled:opacity-40"
           >
-            {ingesting ? "fetching…" : capture ? "Re-ingest" : "Ingest live feed →"}
+            {ingesting ? "fetching…" : capture ? "Re-ingest FAA" : "Ingest FAA →"}
           </button>
         </div>
 
@@ -365,7 +408,7 @@ export default function AirportNow({
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b border-line text-left">
-                      {["checkpoint", "lanes", "model", "crowd", "posted", "conf", "basis"].map((h) => (
+                      {["checkpoint", "lanes", "anchor", "crowd", "posted", "conf", "basis"].map((h) => (
                         <th key={h} className="px-3 py-1.5 font-mono text-[9.5px] font-normal uppercase tracking-[0.13em] text-fg-4">{h}</th>
                       ))}
                     </tr>
@@ -392,7 +435,13 @@ export default function AirportNow({
                                 className="border border-line px-1 leading-4 font-mono text-[10px] text-fg-3 hover:border-fg-4 hover:text-fg disabled:opacity-30">+</button>
                             </span>
                           </td>
-                          <td className="nums px-3 py-2 font-mono text-[12px] text-fg-3">{String(c.props.modelMin)}</td>
+                          <td className="px-3 py-2">
+                            {c.props.anchoredOnFeed
+                              ? <span className="nums font-mono text-[12px] text-ok" title="A direct feed reading is anchoring this number; the model is the projection from it.">
+                                  {String(c.props.observedMin)}<span className="text-fg-4"> feed</span>
+                                </span>
+                              : <span className="nums font-mono text-[12px] text-fg-3">{String(c.props.modelMin)}</span>}
+                          </td>
                           <td className="px-3 py-2">
                             {Number(c.props.reportsUsed) > 0
                               ? <span className="nums font-mono text-[12px] text-fg-3">{String(c.props.communityMin)}<span className="text-fg-4"> ·{String(c.props.reportsUsed)}r@{String(c.props.crowdWeightPct)}%</span></span>
@@ -456,6 +505,7 @@ export default function AirportNow({
                         <span className="font-mono text-[10px] text-fg-4">{r.key}</span>
                         <span className={`font-mono text-[10.5px] ${cur ? "text-fg-2" : "text-fg-4 line-through"}`}>
                           {String(r.props.checkpoint)} · {String(r.props.waitMin)}m
+                          {Number(r.props.photos) > 0 && <span className="text-fg-4"> · {String(r.props.photos)} ph</span>}
                         </span>
                         <span className={`ml-auto font-mono text-[10px] ${cur ? "text-ok" : "text-fg-4"}`}>
                           {cur ? `${r.props.ageMin}m` : `aged out ${r.props.ageMin}m`}
@@ -495,18 +545,19 @@ export default function AirportNow({
 
             <div className="border-b border-line px-3 py-2.5">
               <span className="font-mono text-[10px] uppercase tracking-[0.13em] text-fg-4"
-                title="Inject a community observation into this world. Pure — it adds evidence and counts toward the posted number for 120 minutes, then ages out of the window without being deleted (I2).">
-                inject a community report
+                title="Your observation counts toward the posted wait for 120 minutes, then ages out of the window — and is never deleted (I2).">
+                report this queue
               </span>
-              <div className="mt-1.5 grid grid-cols-[1fr_64px] gap-1.5">
+              <div className="mt-1.5 grid grid-cols-[1fr_54px_46px] gap-1.5">
                 <select value={reportTarget} onChange={(e) => setRCheckpoint(e.target.value)} className={field}>
                   {checkpoints.map((c) => <option key={c.key} value={c.key}>{c.key}</option>)}
                 </select>
                 <input value={rWait} onChange={(e) => setRWait(e.target.value)} inputMode="numeric" className={field} title="observed wait, minutes" />
+                <input value={rPhotos} onChange={(e) => setRPhotos(e.target.value)} inputMode="numeric" className={field} title="photos attached — a report with a photo carries more confidence" />
               </div>
-              <button disabled={locked} onClick={() => act("RecordReport", { checkpoint: reportTarget, waitMin: rWait, photos: 0 })}
+              <button disabled={locked} onClick={() => act("RecordReport", { checkpoint: reportTarget, waitMin: rWait, photos: rPhotos })}
                 className="btn btn-sm mt-1.5 w-full text-center disabled:opacity-40">
-                Record report
+                I&rsquo;m in this queue
               </button>
             </div>
 
